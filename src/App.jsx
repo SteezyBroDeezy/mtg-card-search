@@ -167,16 +167,19 @@
           {dbStatus === 'downloading' && downloadProgress && (
             <div className={`${theme.bgSecondary} rounded-lg p-6 mb-6`}>
               <h2 className="text-xl font-semibold mb-2">Downloading...</h2>
-              <p className={`${theme.textSecondary}
-  mb-4`}>{downloadProgress.step}</p>
-              <div className={`w-full ${theme.bgTertiary} rounded-full
-  h-4`}>
+              <p className={`${theme.textSecondary} mb-2`}>{downloadProgress.step}</p>
+              {downloadProgress.detail && (
+                <p className={`${theme.textSecondary} text-sm mb-4`}>{downloadProgress.detail}</p>
+              )}
+              <div className={`w-full ${theme.bgTertiary} rounded-full h-4 overflow-hidden`}>
                 <div
-                  className="bg-blue-600 h-4 rounded-full transition-all
-  duration-300"
+                  className="bg-blue-600 h-4 rounded-full transition-all duration-300"
                   style={{ width: downloadProgress.percent + '%' }}
                 ></div>
               </div>
+              <p className={`${theme.textSecondary} text-sm mt-2 text-right`}>
+                {downloadProgress.percent}%
+              </p>
             </div>
           )}
 
