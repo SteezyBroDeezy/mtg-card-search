@@ -30,12 +30,40 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     }, 150)
   }
 
-  // Get price display
-  function getPriceDisplay(c) {
+  function openPriceOracle() {
+    // Open Price Oracle with card search
+    const searchQuery = encodeURIComponent(card.name)
+    window.open(`https://steezybrodeezy.github.io/mtg-price-oracle/?search=${searchQuery}`, '_blank')
+  }
+
+  // Get all price displays
+  function getAllPrices(c) {
+    const prices = []
+
+    if (c.prices?.usd) {
+      prices.push({ source: 'TCGPlayer', price: `$${c.prices.usd}`, type: 'Regular', color: 'text-green-400' })
+    }
+    if (c.prices?.usd_foil) {
+      prices.push({ source: 'TCGPlayer', price: `$${c.prices.usd_foil}`, type: 'Foil', color: 'text-purple-400' })
+    }
+    if (c.prices?.usd_etched) {
+      prices.push({ source: 'TCGPlayer', price: `$${c.prices.usd_etched}`, type: 'Etched', color: 'text-blue-400' })
+    }
+    if (c.prices?.eur) {
+      prices.push({ source: 'Cardmarket', price: `€${c.prices.eur}`, type: 'Regular', color: 'text-green-400' })
+    }
+    if (c.prices?.eur_foil) {
+      prices.push({ source: 'Cardmarket', price: `€${c.prices.eur_foil}`, type: 'Foil', color: 'text-purple-400' })
+    }
+
+    return prices
+  }
+
+  // Get best price for display
+  function getBestPrice(c) {
     if (c.prices?.usd) return { price: `$${c.prices.usd}`, type: 'USD' }
     if (c.prices?.usd_foil) return { price: `$${c.prices.usd_foil}`, type: 'Foil' }
     if (c.prices?.eur) return { price: `€${c.prices.eur}`, type: 'EUR' }
-    if (c.prices?.eur_foil) return { price: `€${c.prices.eur_foil}`, type: 'EUR Foil' }
     return { price: 'No price', type: '' }
   }
 
@@ -55,7 +83,8 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
   const majorFormats = ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'commander', 'pauper']
   const legalFormats = majorFormats.filter(f => card.legalities?.[f] === 'legal')
 
-  const priceInfo = getPriceDisplay(card)
+  const allPrices = getAllPrices(card)
+  const bestPrice = getBestPrice(card)
 
   return (
     <>
@@ -125,14 +154,14 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
                 </div>
               )}
 
-              {/* Current printing info */}
-              <div className="mt-4 text-center">
-                <p className="text-sm text-gray-400">{card.set_name}</p>
-                <p className={`text-2xl font-bold ${priceInfo.price === 'No price' ? 'text-gray-500' : 'text-green-400'}`}>
-                  {priceInfo.price}
-                </p>
-                {priceInfo.type && <p className="text-xs text-gray-500">{priceInfo.type}</p>}
-              </div>
+              {/* Price Oracle Link */}
+              <button
+                onClick={openPriceOracle}
+                className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+              >
+                <span>📊</span>
+                Track Price in Oracle
+              </button>
             </div>
 
             {/* Right Column - Card Details */}
@@ -199,6 +228,25 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
                     'text-gray-500'
                   }`}>{card.rarity}</p>
                 </div>
+              </div>
+
+              {/* Multi-Source Prices */}
+              <div className="p-4 bg-gray-900 rounded-lg">
+                <p className="text-gray-400 text-sm mb-3">Prices</p>
+                {allPrices.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {allPrices.map((p, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-gray-400 text-sm">
+                          {p.source} <span className="text-gray-500">({p.type})</span>
+                        </span>
+                        <span className={`font-bold ${p.color}`}>{p.price}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No pricing data available</p>
+                )}
               </div>
 
               {card.artist && (
@@ -297,7 +345,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
               {showAllPrintings && (
                 <div className="grid gap-2 max-h-64 overflow-y-auto">
                   {allPrintings.map((printing, idx) => {
-                    const pPrice = getPriceDisplay(printing)
+                    const pPrice = getBestPrice(printing)
                     const isSelected = printing.id === card.id
 
                     return (
@@ -311,11 +359,13 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
                         }`}
                       >
                         {/* Mini thumbnail */}
-                        <img
-                          src={printing.image_small}
-                          alt=""
-                          className="w-12 h-auto rounded"
-                        />
+                        {printing.image_small && (
+                          <img
+                            src={printing.image_small}
+                            alt=""
+                            className="w-12 h-auto rounded"
+                          />
+                        )}
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
@@ -350,12 +400,18 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
             </div>
           )}
 
-          <div className="p-4 border-t border-gray-700">
+          <div className="p-4 border-t border-gray-700 flex gap-3">
             <button
               onClick={handleSaveClick}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium"
+              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium"
             >
               Save to List
+            </button>
+            <button
+              onClick={openPriceOracle}
+              className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium"
+            >
+              📊 Track Price
             </button>
           </div>
         </div>

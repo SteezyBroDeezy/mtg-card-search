@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import SearchBar from './components/SearchBar'
+import SearchHelp from './components/SearchHelp'
 import CardDetail from './components/CardDetail'
 import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
@@ -359,6 +360,9 @@ function App() {
           onGroupByNameChange={setGroupByName}
         />
       )}
+
+      {/* Floating Search Help Button */}
+      {dbStatus === 'ready' && <SearchHelp theme={theme} />}
     </div>
   )
 }
