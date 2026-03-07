@@ -117,10 +117,11 @@ function SearchBar({ onSearch, theme }) {
 
     const filterQuery = parts.join(' ')
 
-    // Keep any name search from original query
+    // Keep any name search from original query (filter out all filter syntax)
     const nameQuery = query.split(' ').filter(p =>
       !p.includes(':') &&
-      !p.match(/^(cmc|pow|tou|loy|usd|year|edhrec)/)
+      !p.includes('=') &&
+      !p.match(/^(cmc|pow|tou|loy|usd|year|edhrec|c[=:])/)
     ).join(' ')
 
     const newQuery = nameQuery ? `${nameQuery} ${filterQuery}` : filterQuery
@@ -173,21 +174,31 @@ function SearchBar({ onSearch, theme }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search cards... (click Filters for easy mode or type syntax)"
-            className={`w-full px-4 py-3 ${theme.bgSecondary} border ${theme.border} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            className={`w-full px-4 py-3 ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
           />
-          <button
-            type="button"
-            onClick={() => setShowHelper(!showHelper)}
-            className={`absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1 text-sm font-medium ${
-              showHelper ? 'bg-blue-600 text-white' : theme.bgTertiary
-            } rounded-full hover:opacity-90 transition-colors`}
-          >
-            {showHelper ? 'Close' : 'Filters'}
-          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('syntax'); setShowHelper(true) }}
+              className={`px-2 py-1 text-xs font-medium ${theme.textSecondary} hover:${theme.text} transition-colors`}
+              title="Syntax Help"
+            >
+              ?
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHelper(!showHelper)}
+              className={`px-3 py-1 text-sm font-medium ${
+                showHelper ? 'bg-blue-600 text-white' : theme.bgTertiary
+              } rounded-full hover:opacity-90 transition-colors`}
+            >
+              {showHelper ? 'Close' : 'Filters'}
+            </button>
+          </div>
         </div>
         <button
           type="submit"
-          className={`px-6 py-3 ${theme.accent} text-white rounded-lg font-medium`}
+          className={`px-6 py-3 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''}`}
         >
           Search
         </button>

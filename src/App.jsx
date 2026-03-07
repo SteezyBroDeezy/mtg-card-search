@@ -175,14 +175,14 @@ function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text}`}>
-      <header className={`border-b ${theme.border} p-4`}>
+      <header className={`border-b-2 ${theme.borderAccent || theme.border} p-4 shadow-lg ${theme.glow || ''}`}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">MTG Card Search</h1>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSettings(true)}
-              className={`px-3 py-2 ${theme.bgTertiary} rounded-lg`}
+              className={`px-3 py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
             >
               Settings
             </button>
@@ -191,13 +191,13 @@ function App() {
               <>
                 <button
                   onClick={() => setShowLists(true)}
-                  className={`px-3 py-2 ${theme.bgTertiary} rounded-lg`}
+                  className={`px-3 py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
                 >
                   My Lists
                 </button>
                 <button
                   onClick={handleLogout}
-                  className={`px-3 py-2 ${theme.textSecondary}`}
+                  className={`px-3 py-2 ${theme.textSecondary} hover:opacity-70 transition-opacity`}
                 >
                   Log Out
                 </button>
@@ -205,7 +205,7 @@ function App() {
             ) : (
               <button
                 onClick={() => setShowAuth(true)}
-                className={`px-4 py-2 ${theme.accent} text-white rounded-lg font-medium`}
+                className={`px-4 py-2 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''}`}
               >
                 Log In
               </button>
