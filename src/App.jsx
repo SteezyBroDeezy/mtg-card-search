@@ -327,10 +327,10 @@ function App() {
                     </div>
                   )}
 
-                  {/* Printing count badge */}
+                  {/* Printing count badge - bottom right, smaller */}
                   {card._printingCount > 1 && (
-                    <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded-full">
-                      {card._printingCount} versions
+                    <div className="absolute bottom-2 right-2 bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
+                      {card._printingCount}v
                     </div>
                   )}
 

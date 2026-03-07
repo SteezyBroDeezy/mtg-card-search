@@ -3,6 +3,14 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
+// Version 4 - Added local lists support for offline
+db.version(4).stores({
+  cards: 'id, name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
+  meta: 'key',
+  lists: 'id, name, createdAt, updatedAt, synced',
+  listCards: '[listId+cardId], listId, cardId, addedAt, synced'
+})
+
 // Version 3 - Full featured database with all searchable fields
 db.version(3).stores({
   cards: 'id, name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
