@@ -1,6 +1,6 @@
 import { themes, saveTheme } from '../lib/theme'
 
-function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync }) {
+function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange }) {
   function handleThemeClick(themeName) {
     saveTheme(themeName)
     onThemeChange(themeName)
@@ -31,6 +31,34 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync }) {
           </button>
         </div>
 
+        {/* Search Settings */}
+        <div className="mb-6">
+          <h3 className={`font-medium mb-3 ${theme.text}`}>Search Settings</h3>
+
+          <label className={`flex items-center justify-between p-3 ${theme.bgTertiary} rounded-lg cursor-pointer`}>
+            <div>
+              <p className={theme.text}>Group cards by name</p>
+              <p className={`${theme.textSecondary} text-sm`}>
+                Show one result per card name, with a badge for multiple printings
+              </p>
+            </div>
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={groupByName}
+                onChange={(e) => onGroupByNameChange(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </div>
+          </label>
+
+          <p className={`${theme.textSecondary} text-xs mt-2 px-1`}>
+            When enabled, search shows the cheapest printing of each unique card. Click a card to see all printings and prices.
+          </p>
+        </div>
+
+        {/* Theme Selection */}
         <div className="mb-6">
           <h3 className={`font-medium mb-4 ${theme.text}`}>Theme</h3>
 
@@ -62,6 +90,7 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync }) {
           ))}
         </div>
 
+        {/* Database */}
         <div className={`border-t ${theme.border} pt-4`}>
           <h3 className={`font-medium mb-3 ${theme.text}`}>Database</h3>
           <p className={`${theme.textSecondary} text-sm mb-1`}>
@@ -78,10 +107,11 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync }) {
           </button>
         </div>
 
+        {/* About */}
         <div className={`border-t ${theme.border} pt-4 mt-4`}>
           <h3 className={`font-medium mb-3 ${theme.text}`}>About</h3>
           <p className={`${theme.textSecondary} text-sm`}>
-            MTG Card Search - An offline-capable Magic: The Gathering card search tool.
+            MTG Card Search - An offline-capable Magic: The Gathering card search tool with the most comprehensive search features available.
           </p>
           <p className={`${theme.textSecondary} text-xs mt-2`}>
             Card data provided by Scryfall. This app is not affiliated with Wizards of the Coast.

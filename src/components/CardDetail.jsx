@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import SaveToListModal from './SaveToListModal'
 
-function CardDetail({ card, onClose, user, theme }) {
+function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [currentFace, setCurrentFace] = useState(0)
   const [isFlipping, setIsFlipping] = useState(false)
   const [showLegalities, setShowLegalities] = useState(false)
+  const [showAllPrintings, setShowAllPrintings] = useState(true)
 
   if (!card) return null
 
@@ -29,6 +30,15 @@ function CardDetail({ card, onClose, user, theme }) {
     }, 150)
   }
 
+  // Get price display
+  function getPriceDisplay(c) {
+    if (c.prices?.usd) return { price: `$${c.prices.usd}`, type: 'USD' }
+    if (c.prices?.usd_foil) return { price: `$${c.prices.usd_foil}`, type: 'Foil' }
+    if (c.prices?.eur) return { price: `€${c.prices.eur}`, type: 'EUR' }
+    if (c.prices?.eur_foil) return { price: `€${c.prices.eur_foil}`, type: 'EUR Foil' }
+    return { price: 'No price', type: '' }
+  }
+
   // Get current display values
   const displayImage = activeFace?.image_large || activeFace?.image_normal ||
                        card.image_large || card.image_normal
@@ -45,6 +55,8 @@ function CardDetail({ card, onClose, user, theme }) {
   const majorFormats = ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'commander', 'pauper']
   const legalFormats = majorFormats.filter(f => card.legalities?.[f] === 'legal')
 
+  const priceInfo = getPriceDisplay(card)
+
   return (
     <>
       <div
@@ -52,7 +64,7 @@ function CardDetail({ card, onClose, user, theme }) {
         onClick={onClose}
       >
         <div
-          className="bg-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center p-4 border-b border-gray-700">
@@ -62,8 +74,8 @@ function CardDetail({ card, onClose, user, theme }) {
             </button>
           </div>
 
-          <div className="p-4 flex flex-col md:flex-row gap-6">
-            {/* Card Image with Flip */}
+          <div className="p-4 flex flex-col lg:flex-row gap-6">
+            {/* Left Column - Card Image */}
             <div className="flex-shrink-0 flex flex-col items-center">
               <div
                 className={`relative cursor-pointer transition-transform duration-150 ${
@@ -75,10 +87,10 @@ function CardDetail({ card, onClose, user, theme }) {
                   <img
                     src={displayImage}
                     alt={displayName}
-                    className="w-full md:w-72 rounded-lg shadow-xl"
+                    className="w-full max-w-[300px] rounded-lg shadow-xl"
                   />
                 ) : (
-                  <div className="w-full md:w-72 aspect-[488/680] bg-gray-700 rounded-lg flex items-center justify-center">
+                  <div className="w-full max-w-[300px] aspect-[488/680] bg-gray-700 rounded-lg flex items-center justify-center">
                     <span className="text-gray-500">No image</span>
                   </div>
                 )}
@@ -94,7 +106,7 @@ function CardDetail({ card, onClose, user, theme }) {
                 )}
               </div>
 
-              {/* Face indicator */}
+              {/* Face selector */}
               {hasMultipleFaces && (
                 <div className="flex gap-2 mt-3">
                   {card.card_faces.map((face, idx) => (
@@ -112,9 +124,18 @@ function CardDetail({ card, onClose, user, theme }) {
                   ))}
                 </div>
               )}
+
+              {/* Current printing info */}
+              <div className="mt-4 text-center">
+                <p className="text-sm text-gray-400">{card.set_name}</p>
+                <p className={`text-2xl font-bold ${priceInfo.price === 'No price' ? 'text-gray-500' : 'text-green-400'}`}>
+                  {priceInfo.price}
+                </p>
+                {priceInfo.type && <p className="text-xs text-gray-500">{priceInfo.type}</p>}
+              </div>
             </div>
 
-            {/* Card Details */}
+            {/* Right Column - Card Details */}
             <div className="flex-1 space-y-4">
               {hasMultipleFaces && (
                 <div>
@@ -150,15 +171,13 @@ function CardDetail({ card, onClose, user, theme }) {
                 </div>
               )}
 
-              {/* Loyalty for Planeswalkers */}
+              {/* Loyalty / Defense */}
               {displayLoyalty && (
                 <div>
                   <p className="text-gray-400 text-sm">Starting Loyalty</p>
                   <p className="text-2xl font-bold">{displayLoyalty}</p>
                 </div>
               )}
-
-              {/* Defense for Battles */}
               {displayDefense && (
                 <div>
                   <p className="text-gray-400 text-sm">Defense</p>
@@ -171,7 +190,6 @@ function CardDetail({ card, onClose, user, theme }) {
                   <p className="text-gray-400 text-sm">Set</p>
                   <p>{card.set_name} ({card.set.toUpperCase()})</p>
                 </div>
-
                 <div>
                   <p className="text-gray-400 text-sm">Rarity</p>
                   <p className={`capitalize ${
@@ -183,7 +201,6 @@ function CardDetail({ card, onClose, user, theme }) {
                 </div>
               </div>
 
-              {/* Artist */}
               {card.artist && (
                 <div>
                   <p className="text-gray-400 text-sm">Artist</p>
@@ -191,7 +208,6 @@ function CardDetail({ card, onClose, user, theme }) {
                 </div>
               )}
 
-              {/* Flavor Text */}
               {card.flavor_text && (
                 <div>
                   <p className="text-gray-400 text-sm">Flavor</p>
@@ -199,22 +215,6 @@ function CardDetail({ card, onClose, user, theme }) {
                 </div>
               )}
 
-              {/* Prices */}
-              {(card.prices?.usd || card.prices?.usd_foil) && (
-                <div>
-                  <p className="text-gray-400 text-sm">Prices</p>
-                  <div className="flex gap-4">
-                    {card.prices.usd && (
-                      <span className="text-green-400">${card.prices.usd}</span>
-                    )}
-                    {card.prices.usd_foil && (
-                      <span className="text-purple-400">${card.prices.usd_foil} (Foil)</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Keywords */}
               {card.keywords && card.keywords.length > 0 && (
                 <div>
                   <p className="text-gray-400 text-sm">Keywords</p>
@@ -265,7 +265,7 @@ function CardDetail({ card, onClose, user, theme }) {
                 )}
               </div>
 
-              {/* Reserved List / EDHREC */}
+              {/* Badges */}
               <div className="flex flex-wrap gap-2">
                 {card.reserved && (
                   <span className="px-2 py-1 bg-amber-900/50 text-amber-400 rounded text-xs">
@@ -280,6 +280,75 @@ function CardDetail({ card, onClose, user, theme }) {
               </div>
             </div>
           </div>
+
+          {/* All Printings Section */}
+          {allPrintings.length > 1 && (
+            <div className="border-t border-gray-700 p-4">
+              <button
+                onClick={() => setShowAllPrintings(!showAllPrintings)}
+                className="flex items-center gap-2 text-lg font-semibold mb-3"
+              >
+                All Printings ({allPrintings.length})
+                <svg className={`w-5 h-5 transition-transform ${showAllPrintings ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showAllPrintings && (
+                <div className="grid gap-2 max-h-64 overflow-y-auto">
+                  {allPrintings.map((printing, idx) => {
+                    const pPrice = getPriceDisplay(printing)
+                    const isSelected = printing.id === card.id
+
+                    return (
+                      <button
+                        key={printing.id}
+                        onClick={() => onSelectPrinting?.(printing)}
+                        className={`flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600/30 border border-blue-500'
+                            : 'bg-gray-700/50 hover:bg-gray-700 border border-transparent'
+                        }`}
+                      >
+                        {/* Mini thumbnail */}
+                        <img
+                          src={printing.image_small}
+                          alt=""
+                          className="w-12 h-auto rounded"
+                        />
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{printing.set_name}</p>
+                          <p className="text-sm text-gray-400">
+                            {printing.set.toUpperCase()} · {printing.rarity}
+                            {printing.released_at && ` · ${printing.released_at.substring(0, 4)}`}
+                          </p>
+                        </div>
+
+                        {/* Price */}
+                        <div className="text-right">
+                          <p className={`font-bold ${
+                            pPrice.price === 'No price' ? 'text-gray-500' : 'text-green-400'
+                          }`}>
+                            {pPrice.price}
+                          </p>
+                          {pPrice.type && <p className="text-xs text-gray-500">{pPrice.type}</p>}
+                        </div>
+
+                        {/* Cheapest badge */}
+                        {idx === 0 && pPrice.price !== 'No price' && (
+                          <span className="px-2 py-0.5 bg-green-600 text-white text-xs rounded">
+                            Cheapest
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="p-4 border-t border-gray-700">
             <button
