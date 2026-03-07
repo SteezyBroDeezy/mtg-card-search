@@ -36,7 +36,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     window.open(`https://steezybrodeezy.github.io/mtg-price-oracle/?search=${searchQuery}`, '_blank')
   }
 
-  // Get all price displays
+  // Get all price displays (USD only - TCGPlayer)
   function getAllPrices(c) {
     const prices = []
 
@@ -49,21 +49,15 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     if (c.prices?.usd_etched) {
       prices.push({ source: 'TCGPlayer', price: `$${c.prices.usd_etched}`, type: 'Etched', color: 'text-blue-400' })
     }
-    if (c.prices?.eur) {
-      prices.push({ source: 'Cardmarket', price: `€${c.prices.eur}`, type: 'Regular', color: 'text-green-400' })
-    }
-    if (c.prices?.eur_foil) {
-      prices.push({ source: 'Cardmarket', price: `€${c.prices.eur_foil}`, type: 'Foil', color: 'text-purple-400' })
-    }
 
     return prices
   }
 
-  // Get best price for display
+  // Get best price for display (USD only)
   function getBestPrice(c) {
     if (c.prices?.usd) return { price: `$${c.prices.usd}`, type: 'USD' }
     if (c.prices?.usd_foil) return { price: `$${c.prices.usd_foil}`, type: 'Foil' }
-    if (c.prices?.eur) return { price: `€${c.prices.eur}`, type: 'EUR' }
+    if (c.prices?.usd_etched) return { price: `$${c.prices.usd_etched}`, type: 'Etched' }
     return { price: 'No price', type: '' }
   }
 
