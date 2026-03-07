@@ -1,6 +1,6 @@
 // All available search filters with descriptions
 export const SEARCH_FILTERS = [
-  { prefix: 'c:', name: 'Color', description: 'Card colors', examples: ['c:red', 'c:blue', 'c:white', 'c:black', 'c:green', 'c:colorless'] },
+  { prefix: 'c:', name: 'Color', description: 'Card colors (c: contains, c= exact)', examples: ['c:red', 'c:blue', 'c=redgreen', 'c=mono', 'c:colorless'] },
   { prefix: 'id:', name: 'Color Identity', description: 'Commander color identity', examples: ['id:wubrg', 'id:bg', 'id:rg', 'id:mono'] },
   { prefix: 't:', name: 'Type', description: 'Card type', examples: ['t:creature', 't:instant', 't:sorcery', 't:enchantment', 't:artifact', 't:land', 't:planeswalker'] },
   { prefix: 'cmc', name: 'Mana Value', description: 'Converted mana cost', examples: ['cmc=3', 'cmc<2', 'cmc>=5', 'cmc<=4'] },
@@ -82,9 +82,10 @@ export function parseSearch(query) {
   for (const part of parts) {
     const lower = part.toLowerCase()
 
-    // Color filter: c:red, c:blue, etc.
-    if (lower.startsWith('c:')) {
-      const color = lower.slice(2)
+    // Color filter: c:red (contains), c=red (exact), c=redgreen (exact multicolor)
+    if (lower.startsWith('c:') || lower.startsWith('c=')) {
+      const isExact = lower.startsWith('c=')
+      const colorStr = lower.slice(2)
       const colorMap = {
         'white': 'W', 'w': 'W',
         'blue': 'U', 'u': 'U',
@@ -93,8 +94,41 @@ export function parseSearch(query) {
         'green': 'G', 'g': 'G',
         'colorless': 'C', 'c': 'C'
       }
-      if (colorMap[color]) {
-        filters.push({ type: 'color', value: colorMap[color] })
+
+      if (isExact) {
+        // Parse exact colors - could be "redgreen", "mono", or single color names
+        if (colorStr === 'mono') {
+          filters.push({ type: 'color_exact', value: 'mono' })
+        } else if (colorStr === 'colorless') {
+          filters.push({ type: 'color_exact', value: [] })
+        } else {
+          // Parse combined color string like "redgreen" or "whiteblue"
+          const colors = []
+          let remaining = colorStr
+
+          // Try to match full color names first
+          const colorNames = ['white', 'blue', 'black', 'red', 'green', 'colorless']
+          for (const name of colorNames) {
+            while (remaining.includes(name)) {
+              remaining = remaining.replace(name, '')
+              if (colorMap[name]) colors.push(colorMap[name])
+            }
+          }
+
+          // Then match single letters
+          for (const char of remaining) {
+            if (colorMap[char] && !colors.includes(colorMap[char])) {
+              colors.push(colorMap[char])
+            }
+          }
+
+          filters.push({ type: 'color_exact', value: colors })
+        }
+      } else {
+        // Contains color
+        if (colorMap[colorStr]) {
+          filters.push({ type: 'color', value: colorMap[colorStr] })
+        }
       }
     }
     // Color identity filter: id:wubrg, id:bg, etc.
@@ -290,6 +324,31 @@ export function matchesFilters(card, filters, nameSearch) {
         } else {
           // Has specific color
           if (!card.colors || !card.colors.includes(filter.value)) return false
+        }
+        break
+
+      case 'color_exact':
+        // Exact color match
+        if (filter.value === 'mono') {
+          // Mono-colored: exactly 1 color
+          if (!card.colors || card.colors.length !== 1) return false
+        } else if (Array.isArray(filter.value)) {
+          if (filter.value.length === 0) {
+            // Colorless: no colors
+            if (card.colors && card.colors.length > 0) return false
+          } else {
+            // Exact color match: card must have exactly these colors
+            const cardColors = card.colors || []
+            if (cardColors.length !== filter.value.length) return false
+            // Check all required colors are present
+            for (const c of filter.value) {
+              if (!cardColors.includes(c)) return false
+            }
+            // Check no extra colors
+            for (const c of cardColors) {
+              if (!filter.value.includes(c)) return false
+            }
+          }
         }
         break
 

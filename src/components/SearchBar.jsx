@@ -17,6 +17,7 @@ function SearchBar({ onSearch, theme }) {
 
   // Selected filters for toggle UI
   const [selectedColors, setSelectedColors] = useState([])
+  const [exactColors, setExactColors] = useState(false) // Exact color match toggle
   const [selectedIdentity, setSelectedIdentity] = useState([])
   const [selectedTypes, setSelectedTypes] = useState([])
   const [selectedRarities, setSelectedRarities] = useState([])
@@ -63,11 +64,20 @@ function SearchBar({ onSearch, theme }) {
   function applyFilters() {
     const parts = []
 
-    // Colors
-    selectedColors.forEach(c => {
+    // Colors - use c= for exact match, c: for contains
+    if (selectedColors.length > 0) {
       const names = { W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless' }
-      parts.push(`c:${names[c]}`)
-    })
+      if (exactColors) {
+        // Exact match: card colors must be exactly these colors
+        const colorStr = selectedColors.map(c => names[c]).join('')
+        parts.push(`c=${colorStr}`)
+      } else {
+        // Contains: card must have each of these colors (but can have more)
+        selectedColors.forEach(c => {
+          parts.push(`c:${names[c]}`)
+        })
+      }
+    }
 
     // Color Identity
     if (selectedIdentity.length > 0) {
@@ -116,10 +126,12 @@ function SearchBar({ onSearch, theme }) {
     const newQuery = nameQuery ? `${nameQuery} ${filterQuery}` : filterQuery
     setQuery(newQuery.trim())
     onSearch(newQuery.trim())
+    setShowHelper(false) // Close filter panel after applying
   }
 
   function clearFilters() {
     setSelectedColors([])
+    setExactColors(false)
     setSelectedIdentity([])
     setSelectedTypes([])
     setSelectedRarities([])
@@ -205,8 +217,28 @@ function SearchBar({ onSearch, theme }) {
             {activeTab === 'colors' && (
               <div className="space-y-6">
                 <div>
-                  <p className={`font-medium mb-2`}>Card Colors</p>
-                  <p className={`${theme.textSecondary} text-xs mb-3`}>Cards that ARE these colors</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className={`font-medium`}>Card Colors</p>
+                    <label className={`flex items-center gap-2 text-sm cursor-pointer`}>
+                      <span className={exactColors ? theme.text : theme.textSecondary}>
+                        Exact colors only
+                      </span>
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={exactColors}
+                          onChange={(e) => setExactColors(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5 bg-gray-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                      </div>
+                    </label>
+                  </div>
+                  <p className={`${theme.textSecondary} text-xs mb-3`}>
+                    {exactColors
+                      ? 'Cards that are EXACTLY these colors (no more, no less)'
+                      : 'Cards that CONTAIN these colors (may have additional colors)'}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {COLOR_OPTIONS.map(color => (
                       <button
