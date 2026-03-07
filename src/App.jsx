@@ -16,6 +16,8 @@ function App() {
   const [cardCount, setCardCount] = useState(0)
   const [downloadProgress, setDownloadProgress] = useState(null)
   const [searchResults, setSearchResults] = useState([])
+  const [allResults, setAllResults] = useState([])
+  const [displayCount, setDisplayCount] = useState(50)
   const [selectedCard, setSelectedCard] = useState(null)
   const [allPrintings, setAllPrintings] = useState([])
   const [showAuth, setShowAuth] = useState(false)
@@ -125,6 +127,8 @@ function App() {
   async function handleSearch(query) {
     if (!query.trim()) {
       setSearchResults([])
+      setAllResults([])
+      setDisplayCount(50)
       return
     }
 
@@ -134,21 +138,31 @@ function App() {
     if (filters.length === 0 && nameSearch) {
       results = await db.cards
         .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
-        .limit(200) // Get more to account for grouping
+        .limit(500) // Get more results
         .toArray()
     } else {
       results = await db.cards
         .filter(card => matchesFilters(card, filters, nameSearch))
-        .limit(200)
+        .limit(500)
         .toArray()
     }
 
+    let finalResults
     if (groupByName) {
-      const grouped = groupCardsByName(results)
-      setSearchResults(grouped.slice(0, 50))
+      finalResults = groupCardsByName(results)
     } else {
-      setSearchResults(results.slice(0, 50))
+      finalResults = results
     }
+
+    setAllResults(finalResults)
+    setSearchResults(finalResults.slice(0, 50))
+    setDisplayCount(50)
+  }
+
+  function loadMoreResults() {
+    const newCount = displayCount + 50
+    setSearchResults(allResults.slice(0, newCount))
+    setDisplayCount(newCount)
   }
 
   async function handleCardClick(card) {
@@ -285,6 +299,14 @@ function App() {
               </div>
             </div>
 
+            {/* Results count */}
+            {allResults.length > 0 && (
+              <p className={`${theme.textSecondary} text-sm mb-4`}>
+                Showing {searchResults.length} of {allResults.length} results
+                {allResults.length >= 500 && ' (limit reached)'}
+              </p>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {searchResults.map(card => (
                 <div
@@ -292,11 +314,12 @@ function App() {
                   className="group cursor-pointer relative"
                   onClick={() => handleCardClick(card)}
                 >
-                  {card.image_small ? (
+                  {(card.image_normal || card.image_small) ? (
                     <img
-                      src={card.image_small}
+                      src={card.image_normal || card.image_small}
                       alt={card.name}
                       className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
+                      loading="lazy"
                     />
                   ) : (
                     <div className={`w-full aspect-[488/680] ${theme.bgSecondary} rounded-lg flex items-center justify-center`}>
@@ -320,6 +343,18 @@ function App() {
                 </div>
               ))}
             </div>
+
+            {/* Load More button */}
+            {searchResults.length > 0 && searchResults.length < allResults.length && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={loadMoreResults}
+                  className={`px-8 py-3 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''}`}
+                >
+                  Load More ({allResults.length - searchResults.length} remaining)
+                </button>
+              </div>
+            )}
 
             {searchResults.length === 0 && (
               <p className={`${theme.textSecondary} text-center mt-8`}>Search for cards above</p>
