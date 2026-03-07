@@ -5,6 +5,7 @@ function CardDetail({ card, onClose, user, theme }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [currentFace, setCurrentFace] = useState(0)
   const [isFlipping, setIsFlipping] = useState(false)
+  const [showLegalities, setShowLegalities] = useState(false)
 
   if (!card) return null
 
@@ -37,6 +38,12 @@ function CardDetail({ card, onClose, user, theme }) {
   const displayOracleText = activeFace?.oracle_text || card.oracle_text
   const displayPower = activeFace?.power || card.power
   const displayToughness = activeFace?.toughness || card.toughness
+  const displayLoyalty = activeFace?.loyalty || card.loyalty
+  const displayDefense = activeFace?.defense || card.defense
+
+  // Format legalities for display
+  const majorFormats = ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'commander', 'pauper']
+  const legalFormats = majorFormats.filter(f => card.legalities?.[f] === 'legal')
 
   return (
     <>
@@ -143,6 +150,22 @@ function CardDetail({ card, onClose, user, theme }) {
                 </div>
               )}
 
+              {/* Loyalty for Planeswalkers */}
+              {displayLoyalty && (
+                <div>
+                  <p className="text-gray-400 text-sm">Starting Loyalty</p>
+                  <p className="text-2xl font-bold">{displayLoyalty}</p>
+                </div>
+              )}
+
+              {/* Defense for Battles */}
+              {displayDefense && (
+                <div>
+                  <p className="text-gray-400 text-sm">Defense</p>
+                  <p className="text-2xl font-bold">{displayDefense}</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-400 text-sm">Set</p>
@@ -204,6 +227,57 @@ function CardDetail({ card, onClose, user, theme }) {
                   </div>
                 </div>
               )}
+
+              {/* Format Legality */}
+              <div>
+                <button
+                  onClick={() => setShowLegalities(!showLegalities)}
+                  className="text-gray-400 text-sm hover:text-white flex items-center gap-1"
+                >
+                  Format Legality
+                  <svg className={`w-4 h-4 transition-transform ${showLegalities ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {!showLegalities && legalFormats.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {legalFormats.map(f => (
+                      <span key={f} className="px-2 py-0.5 bg-green-900/50 text-green-400 rounded text-xs capitalize">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {showLegalities && card.legalities && (
+                  <div className="grid grid-cols-2 gap-1 mt-2">
+                    {Object.entries(card.legalities).map(([format, status]) => (
+                      <div key={format} className="flex items-center gap-2 text-sm">
+                        <span className={`w-2 h-2 rounded-full ${
+                          status === 'legal' ? 'bg-green-500' :
+                          status === 'banned' ? 'bg-red-500' :
+                          status === 'restricted' ? 'bg-yellow-500' :
+                          'bg-gray-600'
+                        }`} />
+                        <span className="capitalize text-gray-300">{format}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Reserved List / EDHREC */}
+              <div className="flex flex-wrap gap-2">
+                {card.reserved && (
+                  <span className="px-2 py-1 bg-amber-900/50 text-amber-400 rounded text-xs">
+                    Reserved List
+                  </span>
+                )}
+                {card.edhrec_rank && (
+                  <span className="px-2 py-1 bg-purple-900/50 text-purple-400 rounded text-xs">
+                    EDHREC #{card.edhrec_rank.toLocaleString()}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

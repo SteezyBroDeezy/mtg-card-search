@@ -3,13 +3,18 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
-// Define tables - version 2 adds power, toughness, artist, card_faces
-db.version(2).stores({
-  cards: 'id, name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist',
+// Version 3 - Full featured database with all searchable fields
+db.version(3).stores({
+  cards: 'id, name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
   meta: 'key'
 }).upgrade(tx => {
   // Clear cards to force re-download with new fields
   return tx.table('cards').clear()
+})
+
+db.version(2).stores({
+  cards: 'id, name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist',
+  meta: 'key'
 })
 
 db.version(1).stores({

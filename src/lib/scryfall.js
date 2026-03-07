@@ -89,16 +89,22 @@ export async function downloadCards(onProgress) {
         oracle_text: card.oracle_text || '',
         power: card.power || '',
         toughness: card.toughness || '',
+        loyalty: card.loyalty || '',
+        defense: card.defense || '',
         artist: card.artist || '',
         set: card.set,
         set_name: card.set_name,
         rarity: card.rarity,
         colors: card.colors || [],
         color_identity: card.color_identity || [],
+        produced_mana: card.produced_mana || [],
         prices: card.prices || {},
         legalities: card.legalities || {},
         keywords: card.keywords || [],
-        flavor_text: card.flavor_text || ''
+        flavor_text: card.flavor_text || '',
+        reserved: card.reserved || false,
+        edhrec_rank: card.edhrec_rank || null,
+        released_at: card.released_at || ''
       }
 
       // Single-faced card
@@ -117,6 +123,8 @@ export async function downloadCards(onProgress) {
           oracle_text: face.oracle_text || '',
           power: face.power || '',
           toughness: face.toughness || '',
+          loyalty: face.loyalty || '',
+          defense: face.defense || '',
           image_small: face.image_uris?.small || '',
           image_normal: face.image_uris?.normal || '',
           image_large: face.image_uris?.large || ''
@@ -128,12 +136,15 @@ export async function downloadCards(onProgress) {
         cardData.image_large = faces[0].image_large
         cardData.oracle_text = faces.map(f => f.oracle_text).join('\n---\n')
 
-        // Get power/toughness from first face if main card doesn't have it
+        // Get power/toughness/loyalty from first face if main card doesn't have it
         if (!cardData.power && faces[0].power) {
           cardData.power = faces[0].power
         }
         if (!cardData.toughness && faces[0].toughness) {
           cardData.toughness = faces[0].toughness
+        }
+        if (!cardData.loyalty && faces[0].loyalty) {
+          cardData.loyalty = faces[0].loyalty
         }
       }
       // No images
