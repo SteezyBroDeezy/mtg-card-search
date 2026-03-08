@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SaveToListModal from './SaveToListModal'
+import { addToWatchlist, isInWatchlist, removeFromWatchlist } from '../lib/firebase'
 
 function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -7,6 +8,20 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
   const [isFlipping, setIsFlipping] = useState(false)
   const [showLegalities, setShowLegalities] = useState(false)
   const [showAllPrintings, setShowAllPrintings] = useState(true)
+  const [inWatchlist, setInWatchlist] = useState(false)
+  const [watchlistLoading, setWatchlistLoading] = useState(false)
+
+  useEffect(() => {
+    if (user && card) {
+      checkWatchlist()
+    }
+  }, [user, card])
+
+  async function checkWatchlist() {
+    if (!user || !card) return
+    const result = await isInWatchlist(user.uid, card.id)
+    setInWatchlist(result)
+  }
 
   if (!card) return null
 
@@ -30,10 +45,25 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     }, 150)
   }
 
-  function openPriceOracle() {
-    // Open Price Oracle with card search
-    const searchQuery = encodeURIComponent(card.name)
-    window.open(`https://steezybrodeezy.github.io/mtg-price-oracle/?search=${searchQuery}`, '_blank')
+  async function handleWatchlistToggle() {
+    if (!user) {
+      alert('Please log in to track prices')
+      return
+    }
+
+    setWatchlistLoading(true)
+    try {
+      if (inWatchlist) {
+        await removeFromWatchlist(user.uid, card.id)
+        setInWatchlist(false)
+      } else {
+        await addToWatchlist(user.uid, card)
+        setInWatchlist(true)
+      }
+    } catch (e) {
+      console.error('Watchlist error:', e)
+    }
+    setWatchlistLoading(false)
   }
 
   // Get all price displays (USD only - TCGPlayer)
@@ -148,13 +178,18 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
                 </div>
               )}
 
-              {/* Price Oracle Link */}
+              {/* Watchlist Button */}
               <button
-                onClick={openPriceOracle}
-                className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+                onClick={handleWatchlistToggle}
+                disabled={watchlistLoading}
+                className={`mt-4 px-4 py-2 ${
+                  inWatchlist
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                } text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50`}
               >
-                <span>📊</span>
-                Track Price in Oracle
+                <span>{inWatchlist ? '✓' : '◆'}</span>
+                {watchlistLoading ? 'Saving...' : inWatchlist ? 'In Watchlist' : 'Track Price'}
               </button>
             </div>
 
@@ -402,10 +437,15 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
               Save to List
             </button>
             <button
-              onClick={openPriceOracle}
-              className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium"
+              onClick={handleWatchlistToggle}
+              disabled={watchlistLoading}
+              className={`py-3 px-6 ${
+                inWatchlist
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : 'bg-purple-600 hover:bg-purple-700'
+              } rounded-lg font-medium disabled:opacity-50`}
             >
-              📊 Track Price
+              {inWatchlist ? '✓ Watching' : '◆ Track Price'}
             </button>
           </div>
         </div>

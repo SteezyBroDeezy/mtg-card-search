@@ -115,3 +115,110 @@ import { initializeApp } from 'firebase/app'
   'cards', cardId)
     await updateDoc(cardRef, { note })
   }
+
+  // ==================== PRICE ORACLE FUNCTIONS ====================
+
+  // Get user's Price Oracle data (watchlist, alerts, settings)
+  export async function getPriceOracleData(userId) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    if (docSnap.exists()) {
+      return docSnap.data()
+    }
+    return { watchlist: [], alerts: [], settings: {} }
+  }
+
+  // Save Price Oracle data
+  export async function savePriceOracleData(userId, data) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    await setDoc(docRef, data, { merge: true })
+  }
+
+  // Add card to watchlist
+  export async function addToWatchlist(userId, card) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    const data = docSnap.exists() ? docSnap.data() : { watchlist: [], alerts: [] }
+
+    // Check if already in watchlist
+    if (data.watchlist?.some(c => c.id === card.id)) {
+      return false // Already exists
+    }
+
+    const watchlistCard = {
+      id: card.id,
+      name: card.name,
+      set: card.set,
+      setName: card.set_name,
+      rarity: card.rarity,
+      image: card.image_small || card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small,
+      price: parseFloat(card.prices?.usd) || parseFloat(card.prices?.usd_foil) || 0,
+      priceStr: card.prices?.usd ? `$${card.prices.usd}` : card.prices?.usd_foil ? `$${card.prices.usd_foil}` : 'N/A',
+      addedAt: new Date().toISOString()
+    }
+
+    data.watchlist = [...(data.watchlist || []), watchlistCard]
+    await setDoc(docRef, data, { merge: true })
+    return true
+  }
+
+  // Remove card from watchlist
+  export async function removeFromWatchlist(userId, cardId) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    if (!docSnap.exists()) return
+
+    const data = docSnap.data()
+    data.watchlist = (data.watchlist || []).filter(c => c.id !== cardId)
+    await setDoc(docRef, data, { merge: true })
+  }
+
+  // Check if card is in watchlist
+  export async function isInWatchlist(userId, cardId) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    if (!docSnap.exists()) return false
+    return docSnap.data().watchlist?.some(c => c.id === cardId) || false
+  }
+
+  // Add price alert
+  export async function addPriceAlert(userId, alert) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    const data = docSnap.exists() ? docSnap.data() : { watchlist: [], alerts: [] }
+
+    const newAlert = {
+      id: Date.now().toString(),
+      ...alert,
+      enabled: true,
+      created: new Date().toISOString()
+    }
+
+    data.alerts = [...(data.alerts || []), newAlert]
+    await setDoc(docRef, data, { merge: true })
+    return newAlert.id
+  }
+
+  // Remove price alert
+  export async function removePriceAlert(userId, alertId) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    if (!docSnap.exists()) return
+
+    const data = docSnap.data()
+    data.alerts = (data.alerts || []).filter(a => a.id !== alertId)
+    await setDoc(docRef, data, { merge: true })
+  }
+
+  // Toggle alert enabled/disabled
+  export async function togglePriceAlert(userId, alertId) {
+    const docRef = doc(firestore, 'priceOracleUsers', userId)
+    const docSnap = await getDoc(docRef)
+    if (!docSnap.exists()) return
+
+    const data = docSnap.data()
+    data.alerts = (data.alerts || []).map(a =>
+      a.id === alertId ? { ...a, enabled: !a.enabled } : a
+    )
+    await setDoc(docRef, data, { merge: true })
+  }

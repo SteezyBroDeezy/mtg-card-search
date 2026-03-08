@@ -5,6 +5,7 @@ import CardDetail from './components/CardDetail'
 import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
 import Settings from './components/Settings'
+import PriceOracle from './components/PriceOracle'
 import { hasCards, getDbInfo, db } from './lib/db'
 import { downloadCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
@@ -24,6 +25,7 @@ function App() {
   const [user, setUser] = useState(null)
   const [showLists, setShowLists] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showPriceOracle, setShowPriceOracle] = useState(false)
   const [currentTheme, setCurrentTheme] = useState(loadTheme())
   const [groupByName, setGroupByName] = useState(() => {
     const saved = localStorage.getItem('mtg-group-by-name')
@@ -195,6 +197,14 @@ function App() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowPriceOracle(!showPriceOracle)}
+              className={`px-3 py-2 ${showPriceOracle ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
+            >
+              <span className="text-yellow-400">◆</span>
+              Price Oracle
+            </button>
+
+            <button
               onClick={() => setShowSettings(true)}
               className={`px-3 py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
             >
@@ -229,11 +239,24 @@ function App() {
       </header>
 
       <main className="max-w-6xl mx-auto p-4">
-        {dbStatus === 'checking' && (
+        {/* Price Oracle View */}
+        {showPriceOracle && (
+          <PriceOracle
+            user={user}
+            theme={theme}
+            onCardClick={(card) => {
+              setShowPriceOracle(false)
+              handleCardClick(card)
+            }}
+          />
+        )}
+
+        {/* Regular Search View */}
+        {!showPriceOracle && dbStatus === 'checking' && (
           <div className={theme.textSecondary}>Checking database...</div>
         )}
 
-        {dbStatus === 'empty' && (
+        {!showPriceOracle && dbStatus === 'empty' && (
           <div className={`${theme.bgSecondary} rounded-lg p-6 mb-6`}>
             <h2 className="text-xl font-semibold mb-2">Welcome!</h2>
             <p className={`${theme.textSecondary} mb-4`}>
@@ -248,7 +271,7 @@ function App() {
           </div>
         )}
 
-        {dbStatus === 'downloading' && downloadProgress && (
+        {!showPriceOracle && dbStatus === 'downloading' && downloadProgress && (
           <div className={`${theme.bgSecondary} rounded-lg p-6 mb-6`}>
             <h2 className="text-xl font-semibold mb-2">Downloading...</h2>
             <p className={`${theme.textSecondary} mb-2`}>{downloadProgress.step}</p>
@@ -267,7 +290,7 @@ function App() {
           </div>
         )}
 
-        {dbStatus === 'error' && (
+        {!showPriceOracle && dbStatus === 'error' && (
           <div className="bg-red-900 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-2">Download Failed</h2>
             <button
@@ -279,7 +302,7 @@ function App() {
           </div>
         )}
 
-        {dbStatus === 'ready' && (
+        {!showPriceOracle && dbStatus === 'ready' && (
           <>
             <div className="mb-6">
               <SearchBar onSearch={handleSearch} theme={theme} />
