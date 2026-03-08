@@ -176,17 +176,39 @@ function SearchBar({ onSearch, theme }) {
 
     // Text filters
     if (artistValue) parts.push(`a:${artistValue}`)
-    if (oracleValue) parts.push(`o:"${oracleValue}"`)
     if (setCode) parts.push(`s:${setCode}`)
+
+    // Extract oracle text filters from existing query (preserve phrases like o:"draw a card")
+    const existingOracleMatches = query.match(/o:"[^"]+"/g) || []
+
+    // Add oracleValue from the input field if set
+    if (oracleValue) {
+      parts.push(`o:"${oracleValue}"`)
+    }
+
+    // Add any existing oracle text filters from the query
+    existingOracleMatches.forEach(match => {
+      // Don't duplicate if it's the same as oracleValue
+      const matchValue = match.match(/o:"([^"]+)"/)?.[1]
+      if (matchValue && matchValue !== oracleValue) {
+        parts.push(match)
+      }
+    })
 
     const filterQuery = parts.join(' ')
 
-    // Keep any name search from original query (filter out all filter syntax)
-    const nameQuery = query.split(' ').filter(p =>
-      !p.includes(':') &&
-      !p.includes('=') &&
-      !p.match(/^(cmc|pow|tou|loy|usd|year|edhrec|c[=:])/)
-    ).join(' ')
+    // Keep any name search from original query
+    // First, remove all filter syntax and quoted oracle text to get just the card name
+    let nameQuery = query
+      // Remove oracle text filters (including quoted phrases)
+      .replace(/o:"[^"]+"/g, '')
+      // Remove other filter prefixes
+      .replace(/[a-z]+[:=][^\s]+/gi, '')
+      // Remove numeric filters
+      .replace(/(cmc|pow|tou|loy|usd|year|edhrec)[<>=]+\d+(\.\d+)?/gi, '')
+      // Clean up extra spaces
+      .replace(/\s+/g, ' ')
+      .trim()
 
     const newQuery = nameQuery ? `${nameQuery} ${filterQuery}` : filterQuery
     setQuery(newQuery.trim())
