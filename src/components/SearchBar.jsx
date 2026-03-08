@@ -224,9 +224,117 @@ function SearchBar({ onSearch, theme }) {
     { id: 'formats', label: 'Formats' },
     { id: 'price', label: 'Price' },
     { id: 'keywords', label: 'Keywords' },
+    { id: 'phrases', label: 'Phrases' },
     { id: 'more', label: 'More' },
     { id: 'syntax', label: 'Syntax' }
   ]
+
+  // Common Oracle text phrases organized by category
+  const commonPhrases = {
+    'Card Draw': [
+      'draw a card',
+      'draw two cards',
+      'draw cards equal to',
+      'whenever you draw',
+      'draws a card'
+    ],
+    'Land & Mana': [
+      'play an additional land',
+      'search your library for a basic land',
+      'search your library for a land',
+      'add one mana of any color',
+      'add {G}',
+      'whenever a land enters',
+      'lands you control',
+      'tap target land'
+    ],
+    'ETB Effects': [
+      'enters the battlefield',
+      'enters the battlefield tapped',
+      'when ~ enters the battlefield',
+      'whenever a creature enters',
+      'whenever another creature enters',
+      'enters the battlefield under your control'
+    ],
+    'Destroy & Remove': [
+      'destroy target creature',
+      'destroy target permanent',
+      'destroy target artifact',
+      'destroy target enchantment',
+      'destroy all creatures',
+      'exile target creature',
+      'exile target permanent',
+      'destroy target nonland permanent'
+    ],
+    'Damage': [
+      'deals damage equal to',
+      'deals 1 damage',
+      'deals 2 damage',
+      'deals 3 damage',
+      'damage to any target',
+      'damage to each opponent',
+      'whenever ~ deals combat damage'
+    ],
+    'Combat': [
+      'attacks or blocks',
+      'whenever ~ attacks',
+      'whenever you attack',
+      'can\'t be blocked',
+      'must be blocked',
+      'doesn\'t untap',
+      'attacks each combat if able',
+      'double strike'
+    ],
+    'Life': [
+      'you gain life',
+      'gain 1 life',
+      'gain 2 life',
+      'gain life equal to',
+      'whenever you gain life',
+      'lose life equal to',
+      'pay life'
+    ],
+    'Counters': [
+      '+1/+1 counter',
+      '-1/-1 counter',
+      'put a counter',
+      'remove a counter',
+      'double the number of counters',
+      'whenever a counter is put'
+    ],
+    'Graveyard': [
+      'return target creature card from your graveyard',
+      'from your graveyard to your hand',
+      'from your graveyard to the battlefield',
+      'cards in your graveyard',
+      'mill',
+      'whenever a creature dies',
+      'when ~ dies'
+    ],
+    'Control & Steal': [
+      'gain control of target',
+      'tap target creature',
+      'target creature gets',
+      'counter target spell',
+      'can\'t cast spells',
+      'can\'t attack'
+    ],
+    'Tokens': [
+      'create a token',
+      'create a 1/1',
+      'create a 2/2',
+      'creature tokens',
+      'token copy',
+      'create X tokens'
+    ],
+    'Tutors & Search': [
+      'search your library',
+      'reveal cards from the top',
+      'look at the top',
+      'scry',
+      'put into your hand'
+    ]
+  }
 
   return (
     <div className="relative">
@@ -730,6 +838,48 @@ function SearchBar({ onSearch, theme }) {
                     placeholder='e.g. "draw a card", "destroy target"'
                     className={`w-full px-3 py-2 ${theme.bgTertiary} rounded-lg`}
                   />
+                </div>
+              </div>
+            )}
+
+            {/* Phrases Tab - Common Oracle Text */}
+            {activeTab === 'phrases' && (
+              <div className="space-y-4">
+                <div className={`p-3 ${theme.bgTertiary} rounded-lg`}>
+                  <p className={`${theme.text} font-medium mb-1`}>Click any phrase to add it to your search</p>
+                  <p className={`${theme.textSecondary} text-xs`}>
+                    These are common text patterns found on Magic cards. You can combine them with other filters!
+                  </p>
+                </div>
+
+                <div className="max-h-[50vh] overflow-y-auto space-y-4">
+                  {Object.entries(commonPhrases).map(([category, phrases]) => (
+                    <div key={category}>
+                      <p className={`${theme.text} font-semibold text-sm mb-2`}>{category}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {phrases.map(phrase => (
+                          <button
+                            key={phrase}
+                            onClick={() => insertFilter(`o:"${phrase}"`)}
+                            className={`px-2.5 py-1 text-xs ${theme.bgTertiary} hover:bg-blue-600 hover:text-white rounded transition-colors`}
+                          >
+                            {phrase}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={`p-3 ${theme.bgTertiary} rounded-lg mt-4`}>
+                  <p className={`${theme.text} font-medium mb-2`}>Search Tips</p>
+                  <ul className={`${theme.textSecondary} text-xs space-y-1`}>
+                    <li>• <strong>Order doesn't matter:</strong> <code className="text-blue-400">c:red t:creature</code> = <code className="text-blue-400">t:creature c:red</code></li>
+                    <li>• <strong>Use quotes for phrases:</strong> <code className="text-blue-400">o:"draw a card"</code> not <code className="text-red-400">o:draw a card</code></li>
+                    <li>• <strong>Partial matches work:</strong> <code className="text-blue-400">o:"enters the"</code> finds all ETB cards</li>
+                    <li>• <strong>Combine filters freely:</strong> <code className="text-blue-400">c:green o:"draw" t:creature</code></li>
+                    <li>• <strong>Case doesn't matter:</strong> <code className="text-blue-400">o:"Draw"</code> = <code className="text-blue-400">o:"draw"</code></li>
+                  </ul>
                 </div>
               </div>
             )}
