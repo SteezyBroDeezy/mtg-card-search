@@ -313,85 +313,94 @@ function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text}`}>
-      {/* Sites Navigation Bar */}
-      <div className={`${theme.bgSecondary} border-b border-gray-700 px-4 py-1.5 flex items-center justify-between text-sm`}>
-        <div className="flex items-center gap-4">
+      {/* Sites Navigation Bar - scrollable on mobile */}
+      <div className={`${theme.bgSecondary} border-b border-gray-700 px-2 sm:px-4 py-1.5 overflow-x-auto`}>
+        <div className="flex items-center gap-3 sm:gap-4 min-w-max text-sm">
           <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider hidden sm:inline">My Apps:</span>
-          <span className="text-yellow-400 font-semibold">🔍 Card Search</span>
-          <a href="https://steezybrodeezy.github.io/mtgpricetracker/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium">📊 Price Oracle</a>
-          <a href="https://steezybrodeezy.github.io/mtgdecklist/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium">💀 Deck Skeleton</a>
-          <a href="https://steezybrodeezy.github.io/skull-games/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium">🎮 Skull Games</a>
+          <span className="text-yellow-400 font-semibold whitespace-nowrap">🔍 Cards</span>
+          <a href="https://steezybrodeezy.github.io/mtgpricetracker/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium whitespace-nowrap">📊 Prices</a>
+          <a href="https://steezybrodeezy.github.io/mtgdecklist/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium whitespace-nowrap">💀 Decks</a>
+          <a href="https://steezybrodeezy.github.io/skull-games/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium whitespace-nowrap">🎮 Games</a>
+          <span className="text-gray-500 text-xs hidden lg:inline whitespace-nowrap">✨ One account syncs all!</span>
         </div>
-        <span className="text-gray-500 text-xs hidden md:inline">✨ One account syncs across all!</span>
       </div>
 
-      <header className={`border-b-2 ${theme.borderAccent || theme.border} p-4 shadow-lg ${theme.glow || ''}`}>
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
+      <header className={`border-b-2 ${theme.borderAccent || theme.border} p-2 sm:p-4 shadow-lg ${theme.glow || ''}`}>
+        <div className="max-w-6xl mx-auto flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {/* Clickable title to go back to search */}
             <h1
               onClick={() => setShowPriceOracle(false)}
-              className={`text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity ${showPriceOracle ? theme.textSecondary : ''}`}
+              className={`text-lg sm:text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity truncate ${showPriceOracle ? theme.textSecondary : ''}`}
             >
-              MTG Card Search
+              <span className="hidden sm:inline">MTG Card Search</span>
+              <span className="sm:hidden">MTG Search</span>
             </h1>
             {showPriceOracle && (
-              <span className={`${theme.textSecondary}`}>›</span>
-            )}
-            {showPriceOracle && (
-              <span className="text-yellow-400 font-semibold">Price Oracle</span>
+              <>
+                <span className={`${theme.textSecondary} hidden sm:inline`}>›</span>
+                <span className="text-yellow-400 font-semibold text-sm sm:text-base">Price Oracle</span>
+              </>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {/* Search History Button */}
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className={`px-3 py-2 ${showHistory ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
+              className={`p-2 sm:px-3 sm:py-2 ${showHistory ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
               title="Search History"
             >
               🕒
               {searchHistory.length > 0 && (
-                <span className="text-xs">{searchHistory.length}</span>
+                <span className="text-xs hidden sm:inline">{searchHistory.length}</span>
               )}
             </button>
 
             <button
               onClick={() => setShowPriceOracle(!showPriceOracle)}
-              className={`px-3 py-2 ${showPriceOracle ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
+              className={`p-2 sm:px-3 sm:py-2 ${showPriceOracle ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
+              title="Price Oracle"
             >
               <span className="text-yellow-400">◆</span>
-              <span className="hidden sm:inline">Price Oracle</span>
+              <span className="hidden md:inline">Prices</span>
             </button>
 
             <button
               onClick={() => setShowSettings(true)}
-              className={`px-3 py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
+              className={`p-2 sm:px-3 sm:py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
+              title="Settings"
             >
-              Settings
+              <span className="sm:hidden">⚙️</span>
+              <span className="hidden sm:inline">Settings</span>
             </button>
 
             {user ? (
               <>
                 <button
                   onClick={() => setShowLists(true)}
-                  className={`px-3 py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
+                  className={`p-2 sm:px-3 sm:py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
+                  title="My Lists"
                 >
-                  My Lists
+                  <span className="sm:hidden">📋</span>
+                  <span className="hidden sm:inline">Lists</span>
                 </button>
                 <button
                   onClick={handleLogout}
-                  className={`px-3 py-2 ${theme.textSecondary} hover:opacity-70 transition-opacity`}
+                  className={`p-2 sm:px-3 sm:py-2 ${theme.textSecondary} hover:opacity-70 transition-opacity`}
+                  title="Log Out"
                 >
-                  Log Out
+                  <span className="sm:hidden">🚪</span>
+                  <span className="hidden sm:inline">Log Out</span>
                 </button>
               </>
             ) : (
               <button
                 onClick={() => setShowAuth(true)}
-                className={`px-4 py-2 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''}`}
+                className={`px-3 py-2 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''} text-sm sm:text-base`}
               >
-                Log In
+                <span className="hidden sm:inline">Log In</span>
+                <span className="sm:hidden">👤</span>
               </button>
             )}
           </div>

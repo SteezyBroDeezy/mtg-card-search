@@ -2,9 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>mtg-card-search</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1f2937" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MTG Cards" />
+    <meta name="description" content="Search Magic: The Gathering cards offline with advanced filters" />
+
+    <link rel="icon" type="image/png" sizes="192x192" href="/mtg-card-search/icon-192.png" />
+    <link rel="apple-touch-icon" href="/mtg-card-search/icon-192.png" />
+    <link rel="manifest" href="/mtg-card-search/manifest.webmanifest" />
+
+    <title>MTG Card Search</title>
+
+    <style>
+      /* Prevent pull-to-refresh on mobile */
+      html, body {
+        overscroll-behavior-y: contain;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
