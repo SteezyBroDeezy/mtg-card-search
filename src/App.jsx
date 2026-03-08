@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import SearchBar from './components/SearchBar'
-import SearchHelp from './components/SearchHelp'
 import CardDetail from './components/CardDetail'
 import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
@@ -19,6 +18,8 @@ function App() {
   const [searchResults, setSearchResults] = useState([])
   const [allResults, setAllResults] = useState([])
   const [displayCount, setDisplayCount] = useState(50)
+  const [lastQuery, setLastQuery] = useState('')
+  const [searchError, setSearchError] = useState(null)
   const [selectedCard, setSelectedCard] = useState(null)
   const [allPrintings, setAllPrintings] = useState([])
   const [showAuth, setShowAuth] = useState(false)
@@ -127,6 +128,9 @@ function App() {
   }
 
   async function handleSearch(query) {
+    setLastQuery(query)
+    setSearchError(null)
+
     if (!query.trim()) {
       setSearchResults([])
       setAllResults([])
@@ -137,16 +141,28 @@ function App() {
     const { filters, nameSearch } = parseSearch(query)
 
     let results
-    if (filters.length === 0 && nameSearch) {
-      results = await db.cards
-        .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
-        .limit(500) // Get more results
-        .toArray()
-    } else {
-      results = await db.cards
-        .filter(card => matchesFilters(card, filters, nameSearch))
-        .limit(500)
-        .toArray()
+    try {
+      if (filters.length === 0 && nameSearch) {
+        results = await db.cards
+          .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
+          .limit(500)
+          .toArray()
+      } else {
+        results = await db.cards
+          .filter(card => matchesFilters(card, filters, nameSearch))
+          .limit(500)
+          .toArray()
+      }
+    } catch (err) {
+      console.error('Search error:', err)
+      setSearchError({
+        type: 'error',
+        message: 'Search failed',
+        suggestion: 'Try a simpler search or check your syntax.'
+      })
+      setSearchResults([])
+      setAllResults([])
+      return
     }
 
     let finalResults
@@ -156,9 +172,66 @@ function App() {
       finalResults = results
     }
 
+    // Generate helpful feedback if no results
+    if (finalResults.length === 0) {
+      const errorInfo = getSearchHelpMessage(query, filters, nameSearch)
+      setSearchError(errorInfo)
+    }
+
     setAllResults(finalResults)
     setSearchResults(finalResults.slice(0, 50))
     setDisplayCount(50)
+  }
+
+  // Generate helpful error messages based on the search
+  function getSearchHelpMessage(query, filters, nameSearch) {
+    // Check for common issues
+    const issues = []
+    const suggestions = []
+
+    // Check for unquoted phrases in oracle text
+    if (query.includes('o:') && !query.includes('"') && query.split(' ').length > 2) {
+      issues.push('Oracle text with multiple words needs quotes')
+      suggestions.push('Try: o:"enters the battlefield"')
+    }
+
+    // Check for exact color match with no results
+    if (query.includes('c=') && filters.some(f => f.type === 'color_exact')) {
+      issues.push('Exact color match (c=) is very specific')
+      suggestions.push('Try using c: instead of c= for broader results')
+    }
+
+    // Check for possibly misspelled card name
+    if (!query.includes(':') && nameSearch && nameSearch.length > 3) {
+      suggestions.push(`Make sure "${nameSearch}" is spelled correctly`)
+      suggestions.push('Try typing fewer letters to see suggestions')
+    }
+
+    // Check for format legality issues
+    if (filters.some(f => f.type === 'format')) {
+      issues.push('Format restrictions limit results significantly')
+      suggestions.push('Try removing the format filter to see more cards')
+    }
+
+    // Check for price filters
+    if (filters.some(f => f.type === 'price')) {
+      issues.push('Not all cards have pricing data')
+      suggestions.push('Try removing the price filter')
+    }
+
+    // General suggestions
+    if (suggestions.length === 0) {
+      suggestions.push('Try using fewer filters')
+      suggestions.push('Check spelling of card names')
+      suggestions.push('Use the Filters button for guided search')
+    }
+
+    return {
+      type: 'no_results',
+      message: `No cards found for "${query}"`,
+      issues,
+      suggestions
+    }
   }
 
   function loadMoreResults() {
@@ -391,8 +464,61 @@ function App() {
               </div>
             )}
 
-            {searchResults.length === 0 && (
-              <p className={`${theme.textSecondary} text-center mt-8`}>Search for cards above</p>
+            {searchResults.length === 0 && !searchError && !lastQuery && (
+              <div className={`text-center mt-8 space-y-4`}>
+                <p className={`${theme.textSecondary} text-lg`}>Start typing to search for cards</p>
+                <div className={`${theme.bgSecondary} rounded-lg p-4 max-w-md mx-auto text-left`}>
+                  <p className={`${theme.text} font-medium mb-2`}>Quick Tips:</p>
+                  <ul className={`${theme.textSecondary} text-sm space-y-1`}>
+                    <li>• Type a card name to see suggestions</li>
+                    <li>• Use <code className="text-blue-400">c:red</code> for red cards</li>
+                    <li>• Use <code className="text-blue-400">t:creature</code> for creatures</li>
+                    <li>• Click <span className="font-medium">Filters</span> for guided search</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Search Error / No Results Help */}
+            {searchError && (
+              <div className={`${theme.bgSecondary} rounded-lg p-6 mt-4 max-w-2xl mx-auto`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🔍</span>
+                  <div className="flex-1">
+                    <p className={`${theme.text} font-semibold text-lg mb-2`}>
+                      {searchError.message}
+                    </p>
+
+                    {searchError.issues && searchError.issues.length > 0 && (
+                      <div className="mb-3">
+                        <p className={`${theme.textSecondary} text-sm font-medium mb-1`}>Possible issues:</p>
+                        <ul className="text-yellow-400 text-sm space-y-1">
+                          {searchError.issues.map((issue, i) => (
+                            <li key={i}>⚠️ {issue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {searchError.suggestions && searchError.suggestions.length > 0 && (
+                      <div>
+                        <p className={`${theme.textSecondary} text-sm font-medium mb-1`}>Suggestions:</p>
+                        <ul className={`${theme.textSecondary} text-sm space-y-1`}>
+                          {searchError.suggestions.map((suggestion, i) => (
+                            <li key={i}>💡 {suggestion}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className={`mt-4 pt-3 border-t ${theme.border}`}>
+                      <p className={`${theme.textSecondary} text-xs`}>
+                        Need help? Click the <span className="font-medium">Filters</span> button for guided search, or try the <span className="font-medium">Syntax</span> tab for all search options.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </>
         )}
@@ -431,8 +557,6 @@ function App() {
         />
       )}
 
-      {/* Floating Search Help Button */}
-      {dbStatus === 'ready' && <SearchHelp theme={theme} />}
     </div>
   )
 }

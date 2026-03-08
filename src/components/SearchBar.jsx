@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   SEARCH_FILTERS,
   COLOR_OPTIONS,
@@ -8,12 +8,17 @@ import {
   FORMAT_OPTIONS,
   PROPERTY_OPTIONS
 } from '../lib/search'
+import { db } from '../lib/db'
 
 function SearchBar({ onSearch, theme }) {
   const [query, setQuery] = useState('')
   const [showHelper, setShowHelper] = useState(false)
   const [activeTab, setActiveTab] = useState('colors')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
   const inputRef = useRef(null)
+  const suggestionsRef = useRef(null)
 
   // Selected filters for toggle UI
   const [selectedColors, setSelectedColors] = useState([])
@@ -45,8 +50,67 @@ function SearchBar({ onSearch, theme }) {
   const [oracleValue, setOracleValue] = useState('')
   const [setCode, setSetCode] = useState('')
 
+  // Fetch card name suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      // Only suggest if typing a plain name (no filter syntax)
+      const trimmed = query.trim()
+      if (!trimmed || trimmed.includes(':') || trimmed.includes('=') || trimmed.length < 2) {
+        setSuggestions([])
+        setShowSuggestions(false)
+        return
+      }
+
+      try {
+        const results = await db.cards
+          .where('name')
+          .startsWithIgnoreCase(trimmed)
+          .limit(8)
+          .toArray()
+
+        // Get unique card names
+        const uniqueNames = [...new Set(results.map(c => c.name))].slice(0, 6)
+        setSuggestions(uniqueNames)
+        setShowSuggestions(uniqueNames.length > 0)
+        setSelectedSuggestionIndex(-1)
+      } catch (err) {
+        console.error('Suggestion error:', err)
+        setSuggestions([])
+      }
+    }
+
+    const debounce = setTimeout(fetchSuggestions, 150)
+    return () => clearTimeout(debounce)
+  }, [query])
+
+  function handleSuggestionClick(name) {
+    setQuery(name)
+    setShowSuggestions(false)
+    onSearch(name)
+  }
+
+  function handleKeyDown(e) {
+    if (!showSuggestions || suggestions.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedSuggestionIndex(prev =>
+        prev < suggestions.length - 1 ? prev + 1 : prev
+      )
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1)
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+      e.preventDefault()
+      handleSuggestionClick(suggestions[selectedSuggestionIndex])
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+    }
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
+    setShowSuggestions(false)
     onSearch(query)
   }
 
@@ -173,14 +237,39 @@ function SearchBar({ onSearch, theme }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search cards... (click Filters for easy mode or type syntax)"
+            onKeyDown={handleKeyDown}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            placeholder="Search cards... (start typing or use filters)"
             className={`w-full px-4 py-3 ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
           />
+
+          {/* Autocomplete Suggestions */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div
+              ref={suggestionsRef}
+              className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden`}
+            >
+              {suggestions.map((name, idx) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => handleSuggestionClick(name)}
+                  className={`w-full px-4 py-2 text-left hover:bg-blue-600/30 transition-colors ${
+                    idx === selectedSuggestionIndex ? 'bg-blue-600/40' : ''
+                  } ${theme.text}`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
             <button
               type="button"
               onClick={() => { setActiveTab('syntax'); setShowHelper(true) }}
-              className={`px-2 py-1 text-xs font-medium ${theme.textSecondary} hover:${theme.text} transition-colors`}
+              className={`px-2 py-1 text-xs font-medium ${theme.textSecondary} hover:opacity-80 transition-colors`}
               title="Syntax Help"
             >
               ?

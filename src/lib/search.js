@@ -423,7 +423,7 @@ export function matchesFilters(card, filters, nameSearch) {
         break
 
       case 'oracle':
-        if (!card.oracle_text.toLowerCase().includes(filter.value)) return false
+        if (!card.oracle_text || !card.oracle_text.toLowerCase().includes(filter.value)) return false
         break
 
       case 'artist':
@@ -433,7 +433,7 @@ export function matchesFilters(card, filters, nameSearch) {
       case 'keyword':
         if (!card.keywords || !card.keywords.some(k => k.toLowerCase().includes(filter.value))) {
           // Also check oracle text for keyword
-          if (!card.oracle_text.toLowerCase().includes(filter.value)) return false
+          if (!card.oracle_text || !card.oracle_text.toLowerCase().includes(filter.value)) return false
         }
         break
 

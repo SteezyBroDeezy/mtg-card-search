@@ -12,7 +12,8 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
   const themeGroups = {
     'Basic': ['dark', 'light'],
     'Mana Colors': ['white', 'blue', 'black', 'red', 'green'],
-    'Special': ['mystical', 'artifact', 'multicolor', 'phyrexian', 'eldrazi']
+    'Guilds': ['boros', 'dimir', 'simic', 'rakdos', 'golgari'],
+    'Special': ['mystical', 'artifact', 'multicolor', 'phyrexian', 'eldrazi', 'bone']
   }
 
   return (
