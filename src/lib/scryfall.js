@@ -1,11 +1,9 @@
 import { db } from './db'
 
-const BULK_DATA_URL = 'https://api.scryfall.com/bulk-data'
+const SCRYFALL_API = 'https://api.scryfall.com'
 
 // Process a raw card from Scryfall into our compact format
 function processCard(card) {
-  if (!card.games?.includes('paper')) return null
-
   const hasMultipleFaces = card.card_faces && card.card_faces.length > 1
 
   let cardData = {
@@ -79,192 +77,92 @@ function processCard(card) {
   return cardData
 }
 
-// Streaming JSON array parser - processes cards one at a time
-async function* streamJsonArray(response, onProgress, contentLength, startTime) {
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-
-  let buffer = ''
-  let receivedLength = 0
-  let inString = false
-  let escapeNext = false
-  let depth = 0
-  let cardStart = -1
-  let cardsYielded = 0
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    receivedLength += value.length
-    buffer += decoder.decode(value, { stream: true })
-
-    // Report download progress
-    const percentDownloaded = Math.floor((receivedLength / contentLength) * 35) + 5
-    const downloadedMB = (receivedLength / 1024 / 1024).toFixed(1)
-    const totalMB = (contentLength / 1024 / 1024).toFixed(1)
-    const elapsed = (Date.now() - startTime) / 1000
-    const speed = (receivedLength / 1024 / 1024 / elapsed).toFixed(1)
-
-    onProgress?.({
-      step: 'Downloading & processing...',
-      percent: percentDownloaded,
-      detail: `${downloadedMB}MB / ${totalMB}MB (${speed} MB/s) - ${cardsYielded.toLocaleString()} cards`
-    })
-
-    // Parse buffer for complete JSON objects
-    let i = 0
-    while (i < buffer.length) {
-      const char = buffer[i]
-
-      if (escapeNext) {
-        escapeNext = false
-        i++
-        continue
-      }
-
-      if (char === '\\' && inString) {
-        escapeNext = true
-        i++
-        continue
-      }
-
-      if (char === '"') {
-        inString = !inString
-        i++
-        continue
-      }
-
-      if (inString) {
-        i++
-        continue
-      }
-
-      if (char === '{') {
-        if (depth === 0) {
-          cardStart = i
-        }
-        depth++
-      } else if (char === '}') {
-        depth--
-        if (depth === 0 && cardStart !== -1) {
-          // Found a complete card object
-          const cardJson = buffer.slice(cardStart, i + 1)
-          try {
-            const card = JSON.parse(cardJson)
-            const processed = processCard(card)
-            if (processed) {
-              cardsYielded++
-              yield processed
-            }
-          } catch (e) {
-            // Skip malformed JSON
-          }
-          cardStart = -1
-        }
-      }
-
-      i++
-    }
-
-    // Keep only unprocessed portion of buffer
-    if (cardStart !== -1) {
-      buffer = buffer.slice(cardStart)
-      cardStart = 0
-    } else {
-      // Find the last complete position we can safely discard
-      // Keep some buffer for partial objects
-      const lastBrace = buffer.lastIndexOf('}')
-      if (lastBrace !== -1 && depth === 0) {
-        buffer = buffer.slice(lastBrace + 1)
-      }
-    }
-
-    // Prevent buffer from growing too large - force GC-friendly behavior
-    if (buffer.length > 5000000 && depth === 0) {
-      buffer = ''
-    }
-  }
+// Delay helper to respect Scryfall rate limits
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-export async function downloadCards(onProgress, useFullDataset = false) {
+// Download cards using paginated API calls - mobile friendly!
+export async function downloadCards(onProgress) {
   const startTime = Date.now()
 
   onProgress?.({
-    step: 'Finding download URL...',
+    step: 'Preparing download...',
     percent: 0,
-    detail: 'Connecting to Scryfall API'
+    detail: 'This may take a few minutes'
   })
-
-  const bulkResponse = await fetch(BULK_DATA_URL)
-  const bulkData = await bulkResponse.json()
-
-  // Use oracle_cards (smaller, ~60MB) by default for mobile compatibility
-  // Use default_cards (~200MB) only if explicitly requested
-  const datasetType = useFullDataset ? 'default_cards' : 'oracle_cards'
-  const dataset = bulkData.data.find(d => d.type === datasetType)
-
-  if (!dataset) {
-    throw new Error(`Could not find ${datasetType} dataset`)
-  }
-
-  const fileSizeMB = (dataset.size / 1024 / 1024).toFixed(1)
-  const datasetLabel = useFullDataset ? 'all printings' : 'unique cards'
-  onProgress?.({
-    step: 'Starting download...',
-    percent: 5,
-    detail: `Fetching ${fileSizeMB}MB (${datasetLabel})`
-  })
-
-  const response = await fetch(dataset.download_uri)
-  const contentLength = +response.headers.get('Content-Length') || dataset.size
 
   // Clear existing cards
   await db.cards.clear()
 
-  // Stream and process cards
-  let cardBatch = []
+  // We'll fetch all unique cards using search API with pagination
+  // Using "game:paper" to get paper cards, unique:cards for one per name
+  let nextUrl = `${SCRYFALL_API}/cards/search?q=game%3Apaper&unique=cards&order=name`
   let totalSaved = 0
-  const batchSize = 1000 // Smaller batches for mobile
+  let pageNum = 0
+  const estimatedTotal = 27000 // Approximate unique cards
 
-  onProgress?.({
-    step: 'Downloading & processing...',
-    percent: 5,
-    detail: 'Starting stream...'
-  })
+  while (nextUrl) {
+    pageNum++
 
-  for await (const card of streamJsonArray(response, onProgress, contentLength, startTime)) {
-    cardBatch.push(card)
+    onProgress?.({
+      step: `Downloading page ${pageNum}...`,
+      percent: Math.min(95, Math.floor((totalSaved / estimatedTotal) * 95)),
+      detail: `${totalSaved.toLocaleString()} cards saved`
+    })
 
-    if (cardBatch.length >= batchSize) {
-      await db.cards.bulkAdd(cardBatch)
-      totalSaved += cardBatch.length
-      cardBatch = []
+    try {
+      const response = await fetch(nextUrl)
 
-      // Update progress
-      const elapsed = (Date.now() - startTime) / 1000
-      const rate = Math.floor(totalSaved / elapsed)
-      onProgress?.({
-        step: 'Saving cards...',
-        percent: 40 + Math.min(55, Math.floor(totalSaved / 1500)), // Estimate ~80k cards
-        detail: `${totalSaved.toLocaleString()} cards saved (${rate.toLocaleString()}/sec)`
-      })
+      if (!response.ok) {
+        if (response.status === 429) {
+          // Rate limited - wait and retry
+          onProgress?.({
+            step: 'Rate limited, waiting...',
+            percent: Math.floor((totalSaved / estimatedTotal) * 95),
+            detail: 'Scryfall rate limit - resuming shortly'
+          })
+          await delay(1000)
+          continue
+        }
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.data && data.data.length > 0) {
+        // Process and save this batch
+        const cards = data.data.map(processCard).filter(Boolean)
+
+        if (cards.length > 0) {
+          await db.cards.bulkAdd(cards)
+          totalSaved += cards.length
+        }
+      }
+
+      // Check for next page
+      if (data.has_more && data.next_page) {
+        nextUrl = data.next_page
+        // Respect rate limits - 100ms between requests
+        await delay(100)
+      } else {
+        nextUrl = null
+      }
+
+    } catch (error) {
+      console.error('Fetch error:', error)
+      // On error, wait and retry
+      await delay(500)
     }
-  }
-
-  // Save remaining cards
-  if (cardBatch.length > 0) {
-    await db.cards.bulkAdd(cardBatch)
-    totalSaved += cardBatch.length
   }
 
   await db.meta.put({ key: 'lastSync', value: new Date().toISOString() })
 
-  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
+  const totalTime = ((Date.now() - startTime) / 1000 / 60).toFixed(1)
   onProgress?.({
     step: 'Done!',
     percent: 100,
-    detail: `${totalSaved.toLocaleString()} cards in ${totalTime}s`
+    detail: `${totalSaved.toLocaleString()} cards in ${totalTime} minutes`
   })
 
   return totalSaved

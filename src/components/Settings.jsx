@@ -1,6 +1,6 @@
 import { themes, saveTheme } from '../lib/theme'
 
-function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, onSyncFull, groupByName, onGroupByNameChange }) {
+function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange }) {
   function handleThemeClick(themeName) {
     saveTheme(themeName)
     onThemeChange(themeName)
@@ -101,27 +101,15 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, onS
             Re-sync to get the latest cards and prices from Scryfall
           </p>
 
-          <div className="space-y-2">
-            <button
-              onClick={onSync}
-              className={`w-full py-3 ${theme.accent} text-white rounded-lg font-medium`}
-            >
-              Sync Cards (~60MB)
-            </button>
-            <p className={`${theme.textSecondary} text-xs text-center`}>
-              Recommended for mobile - one card per unique name
-            </p>
-
-            <button
-              onClick={onSyncFull}
-              className={`w-full py-2 ${theme.bgTertiary} ${theme.text} rounded-lg text-sm border ${theme.border}`}
-            >
-              Sync All Printings (~200MB)
-            </button>
-            <p className={`${theme.textSecondary} text-xs text-center`}>
-              Desktop only - includes every reprint variant
-            </p>
-          </div>
+          <button
+            onClick={onSync}
+            className={`w-full py-3 ${theme.accent} text-white rounded-lg font-medium`}
+          >
+            Sync Card Database
+          </button>
+          <p className={`${theme.textSecondary} text-xs text-center mt-2`}>
+            Downloads ~27,000 unique cards. Works on mobile!
+          </p>
         </div>
 
         {/* About */}

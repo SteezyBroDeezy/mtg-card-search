@@ -112,12 +112,12 @@ function App() {
     }
   }
 
-  async function handleDownload(useFullDataset = false) {
+  async function handleDownload() {
     setDbStatus('downloading')
     try {
       const count = await downloadCards((progress) => {
         setDownloadProgress(progress)
-      }, useFullDataset)
+      })
       setCardCount(count)
       setDbStatus('ready')
       setDownloadProgress(null)
@@ -129,12 +129,7 @@ function App() {
 
   async function handleSync() {
     setShowSettings(false)
-    await handleDownload(false) // Use smaller dataset
-  }
-
-  async function handleSyncFull() {
-    setShowSettings(false)
-    await handleDownload(true) // Use full dataset with all printings
+    await handleDownload()
   }
 
   // Helper to get best price from a card
@@ -641,7 +636,6 @@ function App() {
           onClose={() => setShowSettings(false)}
           cardCount={cardCount}
           onSync={handleSync}
-          onSyncFull={handleSyncFull}
           groupByName={groupByName}
           onGroupByNameChange={setGroupByName}
         />
