@@ -187,7 +187,7 @@ async function* streamJsonArray(response, onProgress, contentLength, startTime) 
   }
 }
 
-export async function downloadCards(onProgress) {
+export async function downloadCards(onProgress, useFullDataset = false) {
   const startTime = Date.now()
 
   onProgress?.({
@@ -199,20 +199,25 @@ export async function downloadCards(onProgress) {
   const bulkResponse = await fetch(BULK_DATA_URL)
   const bulkData = await bulkResponse.json()
 
-  const defaultCards = bulkData.data.find(d => d.type === 'default_cards')
-  if (!defaultCards) {
-    throw new Error('Could not find default_cards dataset')
+  // Use oracle_cards (smaller, ~60MB) by default for mobile compatibility
+  // Use default_cards (~200MB) only if explicitly requested
+  const datasetType = useFullDataset ? 'default_cards' : 'oracle_cards'
+  const dataset = bulkData.data.find(d => d.type === datasetType)
+
+  if (!dataset) {
+    throw new Error(`Could not find ${datasetType} dataset`)
   }
 
-  const fileSizeMB = (defaultCards.size / 1024 / 1024).toFixed(1)
+  const fileSizeMB = (dataset.size / 1024 / 1024).toFixed(1)
+  const datasetLabel = useFullDataset ? 'all printings' : 'unique cards'
   onProgress?.({
     step: 'Starting download...',
     percent: 5,
-    detail: `Fetching ${fileSizeMB}MB from Scryfall (streaming)`
+    detail: `Fetching ${fileSizeMB}MB (${datasetLabel})`
   })
 
-  const response = await fetch(defaultCards.download_uri)
-  const contentLength = +response.headers.get('Content-Length') || defaultCards.size
+  const response = await fetch(dataset.download_uri)
+  const contentLength = +response.headers.get('Content-Length') || dataset.size
 
   // Clear existing cards
   await db.cards.clear()
