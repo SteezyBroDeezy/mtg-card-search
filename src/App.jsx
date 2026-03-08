@@ -510,19 +510,19 @@ function App() {
                     </div>
                   )}
 
-                  {/* Printing count badge - bottom right, smaller */}
-                  {card._printingCount > 1 && (
-                    <div className="absolute bottom-2 right-2 bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
-                      {card._printingCount}v
-                    </div>
-                  )}
-
-                  {/* Price badge */}
-                  {card.prices?.usd && (
-                    <div className="absolute bottom-2 left-2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
-                      ${card.prices.usd}
-                    </div>
-                  )}
+                  {/* Price badge with versions count */}
+                  <div className="absolute bottom-2 left-2 flex items-center gap-1">
+                    {card.prices?.usd && (
+                      <div className="bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
+                        ${card.prices.usd}
+                      </div>
+                    )}
+                    {card._printingCount > 1 && (
+                      <div className="bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
+                        {card._printingCount}v
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

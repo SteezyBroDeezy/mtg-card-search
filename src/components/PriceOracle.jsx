@@ -11,32 +11,58 @@ import {
 
 const SCRYFALL_API = 'https://api.scryfall.com'
 
-// Trending categories with Scryfall queries
+// Trending categories with Scryfall queries - focused on budget & commander
 const trendingCategories = [
-  { id: 'expensive', name: 'Most Expensive', icon: '💎', query: 'usd>50', order: 'usd', dir: 'desc' },
-  { id: 'reserved', name: 'Reserved List', icon: '📜', query: 'is:reserved usd>1', order: 'usd', dir: 'desc' },
-  { id: 'standard', name: 'Standard Staples', icon: '⭐', query: 'f:standard usd>1', order: 'usd', dir: 'desc' },
-  { id: 'modern', name: 'Modern Staples', icon: '🔥', query: 'f:modern usd>10', order: 'usd', dir: 'desc' },
-  { id: 'commander', name: 'Commander', icon: '👑', query: 'f:commander usd>5', order: 'edhrec', dir: 'desc' },
-  { id: 'pioneer', name: 'Pioneer', icon: '🌟', query: 'f:pioneer usd>3', order: 'usd', dir: 'desc' },
-  { id: 'pauper', name: 'Pauper', icon: '🪙', query: 'f:pauper usd>0.5', order: 'usd', dir: 'desc' },
-  { id: 'new', name: 'New Releases', icon: '🆕', query: 'year>=2024 usd>1', order: 'released', dir: 'desc' },
-  { id: 'mythic', name: 'Mythic Rares', icon: '🌈', query: 'r:mythic usd>5', order: 'usd', dir: 'desc' },
-  { id: 'planeswalkers', name: 'Planeswalkers', icon: '🧙', query: 't:planeswalker usd>2', order: 'usd', dir: 'desc' },
-  { id: 'lands', name: 'Lands', icon: '🏔️', query: 't:land usd>5', order: 'usd', dir: 'desc' },
-  { id: 'artifacts', name: 'Artifacts', icon: '⚙️', query: 't:artifact usd>5', order: 'usd', dir: 'desc' },
-  { id: 'budget', name: 'Budget Gems', icon: '💰', query: 'usd<5 usd>1', order: 'edhrec', dir: 'desc' },
-  { id: 'foil', name: 'Foil Premium', icon: '✨', query: 'is:foil usd_foil>20', order: 'usd', dir: 'desc' },
-  { id: 'oldschool', name: 'Old School', icon: '📚', query: 'year<=1995 usd>10', order: 'usd', dir: 'desc' },
+  // Budget Categories
+  { id: 'super-budget', name: 'Super Budget (<$1)', icon: '🪙', query: 'usd<1 usd>0.25', order: 'edhrec', dir: 'desc', group: 'Budget' },
+  { id: 'under-2', name: 'Under $2', icon: '💵', query: 'usd<2 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Budget' },
+  { id: 'under-5', name: 'Under $5', icon: '💰', query: 'usd<5 usd>1', order: 'edhrec', dir: 'desc', group: 'Budget' },
+  { id: 'under-10', name: 'Under $10', icon: '💸', query: 'usd<10 usd>3', order: 'edhrec', dir: 'desc', group: 'Budget' },
+  { id: 'under-20', name: 'Under $20', icon: '💎', query: 'usd<20 usd>5', order: 'edhrec', dir: 'desc', group: 'Budget' },
+
+  // Commander Categories
+  { id: 'edh-staples', name: 'EDH Staples', icon: '👑', query: 'f:commander', order: 'edhrec', dir: 'desc', group: 'Commander' },
+  { id: 'edh-budget', name: 'EDH Budget (<$5)', icon: '🎯', query: 'f:commander usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Commander' },
+  { id: 'edh-mid', name: 'EDH Mid ($5-$20)', icon: '⚔️', query: 'f:commander usd<20 usd>5', order: 'edhrec', dir: 'desc', group: 'Commander' },
+  { id: 'commanders', name: 'Popular Commanders', icon: '🏰', query: 'is:commander', order: 'edhrec', dir: 'desc', group: 'Commander' },
+  { id: 'edh-new', name: 'New EDH Cards', icon: '✨', query: 'f:commander year>=2024', order: 'edhrec', dir: 'desc', group: 'Commander' },
+
+  // Recent Sets
+  { id: 'new-2025', name: '2025 Releases', icon: '🆕', query: 'year=2025', order: 'released', dir: 'desc', group: 'Sets' },
+  { id: 'new-2024', name: '2024 Cards', icon: '📅', query: 'year=2024', order: 'edhrec', dir: 'desc', group: 'Sets' },
+  { id: 'new-mythics', name: 'New Mythics', icon: '🌈', query: 'r:mythic year>=2024', order: 'released', dir: 'desc', group: 'Sets' },
+  { id: 'new-rares', name: 'New Rares', icon: '🔶', query: 'r:rare year>=2024', order: 'edhrec', dir: 'desc', group: 'Sets' },
+
+  // Card Types (Budget Focus)
+  { id: 'creatures-budget', name: 'Creatures (<$5)', icon: '🐉', query: 't:creature usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
+  { id: 'instants-budget', name: 'Instants (<$5)', icon: '⚡', query: 't:instant usd<5 usd>0.25', order: 'edhrec', dir: 'desc', group: 'Types' },
+  { id: 'sorceries-budget', name: 'Sorceries (<$5)', icon: '📜', query: 't:sorcery usd<5 usd>0.25', order: 'edhrec', dir: 'desc', group: 'Types' },
+  { id: 'enchantments-budget', name: 'Enchantments (<$5)', icon: '🔮', query: 't:enchantment usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
+  { id: 'artifacts-budget', name: 'Artifacts (<$5)', icon: '⚙️', query: 't:artifact usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
+  { id: 'lands-budget', name: 'Lands (<$10)', icon: '🏔️', query: 't:land usd<10 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
+
+  // Colors (Budget Focus)
+  { id: 'white-budget', name: 'White (<$5)', icon: '⬜', query: 'c:white usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
+  { id: 'blue-budget', name: 'Blue (<$5)', icon: '🔵', query: 'c:blue usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
+  { id: 'black-budget', name: 'Black (<$5)', icon: '⚫', query: 'c:black usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
+  { id: 'red-budget', name: 'Red (<$5)', icon: '🔴', query: 'c:red usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
+  { id: 'green-budget', name: 'Green (<$5)', icon: '🟢', query: 'c:green usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
+  { id: 'multicolor-budget', name: 'Multicolor (<$5)', icon: '🌀', query: 'c>=2 usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
 ]
 
+// Group categories for display
+const categoryGroups = ['Budget', 'Commander', 'Sets', 'Types', 'Colors']
+
 function PriceOracle({ user, theme, onCardClick }) {
-  const [activeTab, setActiveTab] = useState('watchlist')
+  const [activeTab, setActiveTab] = useState('trending')
   const [watchlist, setWatchlist] = useState([])
   const [alerts, setAlerts] = useState([])
   const [trending, setTrending] = useState([])
-  const [trendingCategory, setTrendingCategory] = useState('expensive')
+  const [trendingCategory, setTrendingCategory] = useState('edh-staples')
   const [trendingLoading, setTrendingLoading] = useState(false)
+  const [trendingLoadingMore, setTrendingLoadingMore] = useState(false)
+  const [nextPageUrl, setNextPageUrl] = useState(null)
+  const [totalLoaded, setTotalLoaded] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showAlertModal, setShowAlertModal] = useState(false)
   const [selectedCard, setSelectedCard] = useState(null)
@@ -79,24 +105,53 @@ function PriceOracle({ user, theme, onCardClick }) {
     setLoading(false)
   }
 
-  async function loadTrending(categoryId) {
+  async function loadTrending(categoryId, reset = true) {
     const category = trendingCategories.find(c => c.id === categoryId) || trendingCategories[0]
-    setTrendingLoading(true)
+
+    if (reset) {
+      setTrendingLoading(true)
+      setTrending([])
+      setNextPageUrl(null)
+      setTotalLoaded(0)
+    }
+
     try {
       const response = await fetch(
         `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(category.query)}&order=${category.order}&dir=${category.dir}&unique=cards`
       )
       const data = await response.json()
       if (data.data) {
-        setTrending(data.data.slice(0, 18))
+        setTrending(data.data)
+        setTotalLoaded(data.data.length)
+        setNextPageUrl(data.has_more ? data.next_page : null)
       } else {
         setTrending([])
+        setNextPageUrl(null)
       }
     } catch (e) {
       console.error('Error loading trending:', e)
       setTrending([])
+      setNextPageUrl(null)
     }
     setTrendingLoading(false)
+  }
+
+  async function loadMoreTrending() {
+    if (!nextPageUrl || trendingLoadingMore) return
+
+    setTrendingLoadingMore(true)
+    try {
+      const response = await fetch(nextPageUrl)
+      const data = await response.json()
+      if (data.data) {
+        setTrending(prev => [...prev, ...data.data])
+        setTotalLoaded(prev => prev + data.data.length)
+        setNextPageUrl(data.has_more ? data.next_page : null)
+      }
+    } catch (e) {
+      console.error('Error loading more:', e)
+    }
+    setTrendingLoadingMore(false)
   }
 
   async function handleRemoveFromWatchlist(cardId) {
@@ -349,37 +404,48 @@ function PriceOracle({ user, theme, onCardClick }) {
       {/* Trending Tab */}
       {activeTab === 'trending' && (
         <div>
-          {/* Category Selector */}
-          <div className="mb-4">
-            <p className={`${theme.textSecondary} text-sm mb-2`}>Browse by category:</p>
-            <div className="flex flex-wrap gap-2">
-              {trendingCategories.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => setTrendingCategory(category.id)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
-                    trendingCategory === category.id
-                      ? `${theme.accent} text-white scale-105`
-                      : `${theme.bgTertiary} ${theme.textSecondary} hover:opacity-80`
-                  }`}
-                >
-                  <span>{category.icon}</span>
-                  <span>{category.name}</span>
-                </button>
-              ))}
-            </div>
+          {/* Category Selector - Grouped */}
+          <div className="mb-6 space-y-4">
+            {categoryGroups.map(groupName => (
+              <div key={groupName}>
+                <p className={`${theme.textSecondary} text-xs uppercase tracking-wide mb-2`}>{groupName}</p>
+                <div className="flex flex-wrap gap-2">
+                  {trendingCategories.filter(c => c.group === groupName).map(category => (
+                    <button
+                      key={category.id}
+                      onClick={() => setTrendingCategory(category.id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        trendingCategory === category.id
+                          ? `${theme.accent} text-white scale-105`
+                          : `${theme.bgTertiary} ${theme.textSecondary} hover:opacity-80`
+                      }`}
+                    >
+                      <span>{category.icon}</span>
+                      <span>{category.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Current Category Header */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-2xl">
-              {trendingCategories.find(c => c.id === trendingCategory)?.icon}
-            </span>
-            <h3 className={`text-lg font-semibold ${theme.text}`}>
-              {trendingCategories.find(c => c.id === trendingCategory)?.name}
-            </h3>
-            {trendingLoading && (
-              <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">
+                {trendingCategories.find(c => c.id === trendingCategory)?.icon}
+              </span>
+              <h3 className={`text-lg font-semibold ${theme.text}`}>
+                {trendingCategories.find(c => c.id === trendingCategory)?.name}
+              </h3>
+              {(trendingLoading || trendingLoadingMore) && (
+                <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+              )}
+            </div>
+            {totalLoaded > 0 && (
+              <p className={`${theme.textSecondary} text-sm`}>
+                {totalLoaded} cards loaded
+              </p>
             )}
           </div>
 
@@ -395,28 +461,57 @@ function PriceOracle({ user, theme, onCardClick }) {
               <p>No cards found for this category</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {trending.map(card => (
-                <div
-                  key={card.id}
-                  className="group cursor-pointer"
-                  onClick={() => onCardClick?.(card)}
-                >
-                  <div className="relative">
-                    <img
-                      src={card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal}
-                      alt={card.name}
-                      className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
-                      loading="lazy"
-                    />
-                    <div className="absolute bottom-2 left-2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded font-mono">
-                      {getPrice(card)}
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {trending.map(card => (
+                  <div
+                    key={card.id}
+                    className="group cursor-pointer"
+                    onClick={() => onCardClick?.(card)}
+                  >
+                    <div className="relative">
+                      <img
+                        src={card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal}
+                        alt={card.name}
+                        className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                      />
+                      <div className="absolute bottom-2 left-2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded font-mono">
+                        {getPrice(card)}
+                      </div>
                     </div>
+                    <p className={`mt-2 text-sm truncate ${theme.textSecondary}`}>{card.name}</p>
                   </div>
-                  <p className={`mt-2 text-sm truncate ${theme.textSecondary}`}>{card.name}</p>
+                ))}
+              </div>
+
+              {/* Load More Button */}
+              {nextPageUrl && (
+                <div className="flex justify-center mt-8">
+                  <button
+                    onClick={loadMoreTrending}
+                    disabled={trendingLoadingMore}
+                    className={`px-8 py-3 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''} disabled:opacity-50 flex items-center gap-2`}
+                  >
+                    {trendingLoadingMore ? (
+                      <>
+                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        Loading...
+                      </>
+                    ) : (
+                      <>Load More Cards</>
+                    )}
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+
+              {/* End of results message */}
+              {!nextPageUrl && totalLoaded > 0 && (
+                <p className={`text-center mt-6 ${theme.textSecondary} text-sm`}>
+                  All {totalLoaded} cards loaded
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
