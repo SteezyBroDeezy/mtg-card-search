@@ -28,12 +28,29 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showPriceOracle, setShowPriceOracle] = useState(false)
   const [currentTheme, setCurrentTheme] = useState(loadTheme())
+  const [searchHistory, setSearchHistory] = useState(() => {
+    // Load from localStorage for non-logged-in users
+    const saved = localStorage.getItem('mtg-search-history')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [showHistory, setShowHistory] = useState(false)
   const [groupByName, setGroupByName] = useState(() => {
     const saved = localStorage.getItem('mtg-group-by-name')
     return saved !== null ? saved === 'true' : true // default to true
   })
 
   const theme = themes[currentTheme]
+
+  function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000)
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
 
   useEffect(() => {
     checkDatabase()
@@ -47,6 +64,35 @@ function App() {
   useEffect(() => {
     localStorage.setItem('mtg-group-by-name', groupByName.toString())
   }, [groupByName])
+
+  // Save search history to localStorage
+  useEffect(() => {
+    localStorage.setItem('mtg-search-history', JSON.stringify(searchHistory.slice(0, 20)))
+  }, [searchHistory])
+
+  function addToHistory(query, resultCount) {
+    if (!query.trim()) return
+    const entry = {
+      query,
+      resultCount,
+      timestamp: Date.now()
+    }
+    setSearchHistory(prev => {
+      // Remove duplicate if exists
+      const filtered = prev.filter(h => h.query !== query)
+      return [entry, ...filtered].slice(0, 20)
+    })
+  }
+
+  function clearHistory() {
+    setSearchHistory([])
+    localStorage.removeItem('mtg-search-history')
+  }
+
+  function rerunSearch(query) {
+    setShowHistory(false)
+    handleSearch(query)
+  }
 
   async function requestPersistentStorage() {
     if (navigator.storage && navigator.storage.persist) {
@@ -178,6 +224,9 @@ function App() {
       setSearchError(errorInfo)
     }
 
+    // Add to search history
+    addToHistory(query, finalResults.length)
+
     setAllResults(finalResults)
     setSearchResults(finalResults.slice(0, 50))
     setDisplayCount(50)
@@ -278,15 +327,41 @@ function App() {
 
       <header className={`border-b-2 ${theme.borderAccent || theme.border} p-4 shadow-lg ${theme.glow || ''}`}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">MTG Card Search</h1>
+          <div className="flex items-center gap-3">
+            {/* Clickable title to go back to search */}
+            <h1
+              onClick={() => setShowPriceOracle(false)}
+              className={`text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity ${showPriceOracle ? theme.textSecondary : ''}`}
+            >
+              MTG Card Search
+            </h1>
+            {showPriceOracle && (
+              <span className={`${theme.textSecondary}`}>›</span>
+            )}
+            {showPriceOracle && (
+              <span className="text-yellow-400 font-semibold">Price Oracle</span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
+            {/* Search History Button */}
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`px-3 py-2 ${showHistory ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
+              title="Search History"
+            >
+              🕒
+              {searchHistory.length > 0 && (
+                <span className="text-xs">{searchHistory.length}</span>
+              )}
+            </button>
+
             <button
               onClick={() => setShowPriceOracle(!showPriceOracle)}
               className={`px-3 py-2 ${showPriceOracle ? theme.accent + ' text-white' : theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity flex items-center gap-1`}
             >
               <span className="text-yellow-400">◆</span>
-              Price Oracle
+              <span className="hidden sm:inline">Price Oracle</span>
             </button>
 
             <button
@@ -555,6 +630,67 @@ function App() {
           groupByName={groupByName}
           onGroupByNameChange={setGroupByName}
         />
+      )}
+
+      {/* Search History Modal */}
+      {showHistory && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+          onClick={() => setShowHistory(false)}
+        >
+          <div
+            className={`${theme.bgSecondary} rounded-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 border-b border-gray-700">
+              <h2 className={`text-lg font-bold ${theme.text}`}>Search History</h2>
+              <div className="flex gap-2">
+                {searchHistory.length > 0 && (
+                  <button
+                    onClick={clearHistory}
+                    className="text-red-400 text-sm hover:text-red-300"
+                  >
+                    Clear All
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="text-gray-400 hover:text-white text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {searchHistory.length === 0 ? (
+                <div className={`p-8 text-center ${theme.textSecondary}`}>
+                  <div className="text-4xl mb-3 opacity-50">🕒</div>
+                  <p>No search history yet</p>
+                  <p className="text-sm mt-1">Your recent searches will appear here</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-700">
+                  {searchHistory.map((entry, index) => (
+                    <button
+                      key={index}
+                      onClick={() => rerunSearch(entry.query)}
+                      className={`w-full p-3 text-left hover:${theme.bgTertiary} transition-colors flex justify-between items-center gap-3`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className={`${theme.text} truncate font-medium`}>{entry.query}</p>
+                        <p className={`${theme.textSecondary} text-xs`}>
+                          {entry.resultCount} result{entry.resultCount !== 1 ? 's' : ''} • {formatTimeAgo(entry.timestamp)}
+                        </p>
+                      </div>
+                      <span className={`${theme.textSecondary} text-lg`}>→</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

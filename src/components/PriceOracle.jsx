@@ -11,11 +11,32 @@ import {
 
 const SCRYFALL_API = 'https://api.scryfall.com'
 
+// Trending categories with Scryfall queries
+const trendingCategories = [
+  { id: 'expensive', name: 'Most Expensive', icon: '💎', query: 'usd>50', order: 'usd', dir: 'desc' },
+  { id: 'reserved', name: 'Reserved List', icon: '📜', query: 'is:reserved usd>1', order: 'usd', dir: 'desc' },
+  { id: 'standard', name: 'Standard Staples', icon: '⭐', query: 'f:standard usd>1', order: 'usd', dir: 'desc' },
+  { id: 'modern', name: 'Modern Staples', icon: '🔥', query: 'f:modern usd>10', order: 'usd', dir: 'desc' },
+  { id: 'commander', name: 'Commander', icon: '👑', query: 'f:commander usd>5', order: 'edhrec', dir: 'desc' },
+  { id: 'pioneer', name: 'Pioneer', icon: '🌟', query: 'f:pioneer usd>3', order: 'usd', dir: 'desc' },
+  { id: 'pauper', name: 'Pauper', icon: '🪙', query: 'f:pauper usd>0.5', order: 'usd', dir: 'desc' },
+  { id: 'new', name: 'New Releases', icon: '🆕', query: 'year>=2024 usd>1', order: 'released', dir: 'desc' },
+  { id: 'mythic', name: 'Mythic Rares', icon: '🌈', query: 'r:mythic usd>5', order: 'usd', dir: 'desc' },
+  { id: 'planeswalkers', name: 'Planeswalkers', icon: '🧙', query: 't:planeswalker usd>2', order: 'usd', dir: 'desc' },
+  { id: 'lands', name: 'Lands', icon: '🏔️', query: 't:land usd>5', order: 'usd', dir: 'desc' },
+  { id: 'artifacts', name: 'Artifacts', icon: '⚙️', query: 't:artifact usd>5', order: 'usd', dir: 'desc' },
+  { id: 'budget', name: 'Budget Gems', icon: '💰', query: 'usd<5 usd>1', order: 'edhrec', dir: 'desc' },
+  { id: 'foil', name: 'Foil Premium', icon: '✨', query: 'is:foil usd_foil>20', order: 'usd', dir: 'desc' },
+  { id: 'oldschool', name: 'Old School', icon: '📚', query: 'year<=1995 usd>10', order: 'usd', dir: 'desc' },
+]
+
 function PriceOracle({ user, theme, onCardClick }) {
   const [activeTab, setActiveTab] = useState('watchlist')
   const [watchlist, setWatchlist] = useState([])
   const [alerts, setAlerts] = useState([])
   const [trending, setTrending] = useState([])
+  const [trendingCategory, setTrendingCategory] = useState('expensive')
+  const [trendingLoading, setTrendingLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showAlertModal, setShowAlertModal] = useState(false)
   const [selectedCard, setSelectedCard] = useState(null)
@@ -38,8 +59,14 @@ function PriceOracle({ user, theme, onCardClick }) {
   }, [user])
 
   useEffect(() => {
-    loadTrending()
+    loadTrending(trendingCategory)
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'trending') {
+      loadTrending(trendingCategory)
+    }
+  }, [trendingCategory])
 
   async function loadData() {
     try {
@@ -52,16 +79,24 @@ function PriceOracle({ user, theme, onCardClick }) {
     setLoading(false)
   }
 
-  async function loadTrending() {
+  async function loadTrending(categoryId) {
+    const category = trendingCategories.find(c => c.id === categoryId) || trendingCategories[0]
+    setTrendingLoading(true)
     try {
-      const response = await fetch(`${SCRYFALL_API}/cards/search?q=usd>1&order=usd&dir=desc&unique=cards`)
+      const response = await fetch(
+        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(category.query)}&order=${category.order}&dir=${category.dir}&unique=cards`
+      )
       const data = await response.json()
       if (data.data) {
-        setTrending(data.data.slice(0, 12))
+        setTrending(data.data.slice(0, 18))
+      } else {
+        setTrending([])
       }
     } catch (e) {
       console.error('Error loading trending:', e)
+      setTrending([])
     }
+    setTrendingLoading(false)
   }
 
   async function handleRemoveFromWatchlist(cardId) {
@@ -314,31 +349,75 @@ function PriceOracle({ user, theme, onCardClick }) {
       {/* Trending Tab */}
       {activeTab === 'trending' && (
         <div>
-          <p className={`${theme.textSecondary} mb-4`}>
-            Top priced cards from Scryfall
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {trending.map(card => (
-              <div
-                key={card.id}
-                className="group cursor-pointer"
-                onClick={() => onCardClick?.(card)}
-              >
-                <div className="relative">
-                  <img
-                    src={card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal}
-                    alt={card.name}
-                    className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
-                    loading="lazy"
-                  />
-                  <div className="absolute bottom-2 left-2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded font-mono">
-                    {getPrice(card)}
-                  </div>
-                </div>
-                <p className={`mt-2 text-sm truncate ${theme.textSecondary}`}>{card.name}</p>
-              </div>
-            ))}
+          {/* Category Selector */}
+          <div className="mb-4">
+            <p className={`${theme.textSecondary} text-sm mb-2`}>Browse by category:</p>
+            <div className="flex flex-wrap gap-2">
+              {trendingCategories.map(category => (
+                <button
+                  key={category.id}
+                  onClick={() => setTrendingCategory(category.id)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                    trendingCategory === category.id
+                      ? `${theme.accent} text-white scale-105`
+                      : `${theme.bgTertiary} ${theme.textSecondary} hover:opacity-80`
+                  }`}
+                >
+                  <span>{category.icon}</span>
+                  <span>{category.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Current Category Header */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">
+              {trendingCategories.find(c => c.id === trendingCategory)?.icon}
+            </span>
+            <h3 className={`text-lg font-semibold ${theme.text}`}>
+              {trendingCategories.find(c => c.id === trendingCategory)?.name}
+            </h3>
+            {trendingLoading && (
+              <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+            )}
+          </div>
+
+          {/* Cards Grid */}
+          {trendingLoading ? (
+            <div className={`py-12 text-center ${theme.textSecondary}`}>
+              <div className="animate-spin w-8 h-8 border-2 border-current border-t-transparent rounded-full mx-auto mb-4"></div>
+              Loading cards...
+            </div>
+          ) : trending.length === 0 ? (
+            <div className={`py-12 text-center ${theme.textSecondary}`}>
+              <div className="text-4xl mb-3 opacity-50">🔍</div>
+              <p>No cards found for this category</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {trending.map(card => (
+                <div
+                  key={card.id}
+                  className="group cursor-pointer"
+                  onClick={() => onCardClick?.(card)}
+                >
+                  <div className="relative">
+                    <img
+                      src={card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal}
+                      alt={card.name}
+                      className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
+                      loading="lazy"
+                    />
+                    <div className="absolute bottom-2 left-2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded font-mono">
+                      {getPrice(card)}
+                    </div>
+                  </div>
+                  <p className={`mt-2 text-sm truncate ${theme.textSecondary}`}>{card.name}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
