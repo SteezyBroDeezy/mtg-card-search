@@ -191,6 +191,17 @@ function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text}`}>
+      {/* Sites Navigation Bar */}
+      <div className={`${theme.bgSecondary} border-b border-gray-700 px-4 py-1.5 flex items-center justify-between text-sm`}>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider hidden sm:inline">MTG Suite:</span>
+          <span className="text-yellow-400 font-semibold">🔍 Card Search</span>
+          <a href="https://steezybrodeezy.github.io/mtgpricetracker/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium">📊 Price Oracle</a>
+          <a href="https://steezybrodeezy.github.io/mtgdecklist/" className="text-gray-400 hover:text-yellow-400 transition-colors font-medium">💀 Deck Skeleton</a>
+        </div>
+        <span className="text-gray-500 text-xs hidden md:inline">✨ One account syncs across all three!</span>
+      </div>
+
       <header className={`border-b-2 ${theme.borderAccent || theme.border} p-4 shadow-lg ${theme.glow || ''}`}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">MTG Card Search</h1>
