@@ -358,10 +358,23 @@ function SearchBar({ onSearch, theme }) {
     ]
   }
 
+  // Quick phrases for mobile - most popular
+  const quickPhrases = [
+    { label: 'ETB', phrase: 'enters the battlefield' },
+    { label: '+Land', phrase: 'play an additional land' },
+    { label: 'Draw', phrase: 'draw a card' },
+    { label: 'Destroy', phrase: 'destroy target' },
+    { label: 'Counter', phrase: 'counter target spell' },
+    { label: '+1/+1', phrase: '+1/+1 counter' },
+    { label: 'Token', phrase: 'create a token' },
+    { label: 'Tutor', phrase: 'search your library' },
+  ]
+
   return (
-    <div className="relative">
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <div className="relative flex-1">
+    <div className="relative space-y-2">
+      {/* Search Input - Full Width */}
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <div className="relative">
           <input
             ref={inputRef}
             type="text"
@@ -370,8 +383,8 @@ function SearchBar({ onSearch, theme }) {
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            placeholder="Search cards... (start typing or use filters)"
-            className={`w-full px-4 py-3 ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
+            placeholder="Search cards..."
+            className={`w-full px-4 py-3 pr-24 ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
           />
 
           {/* Autocomplete Suggestions */}
@@ -395,32 +408,53 @@ function SearchBar({ onSearch, theme }) {
             </div>
           )}
 
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-            <button
-              type="button"
-              onClick={() => { setActiveTab('syntax'); setShowHelper(true) }}
-              className={`px-2 py-1 text-xs font-medium ${theme.textSecondary} hover:opacity-80 transition-colors`}
-              title="Syntax Help"
-            >
-              ?
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowHelper(!showHelper)}
-              className={`px-3 py-1 text-sm font-medium ${
-                showHelper ? 'bg-blue-600 text-white' : theme.bgTertiary
-              } rounded-full hover:opacity-90 transition-colors`}
-            >
-              {showHelper ? 'Close' : 'Filters'}
-            </button>
-          </div>
+          {/* Search button inside input on right */}
+          <button
+            type="submit"
+            className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 ${theme.accent} text-white rounded-lg font-medium text-sm`}
+          >
+            Search
+          </button>
         </div>
-        <button
-          type="submit"
-          className={`px-6 py-3 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''}`}
-        >
-          Search
-        </button>
+
+        {/* Quick Actions Row */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setShowHelper(!showHelper)}
+            className={`flex-shrink-0 px-3 py-1.5 text-sm font-medium ${
+              showHelper ? 'bg-blue-600 text-white' : theme.bgTertiary
+            } rounded-lg hover:opacity-90 transition-colors flex items-center gap-1`}
+          >
+            <span>⚙️</span>
+            <span>Filters</span>
+          </button>
+
+          <div className={`h-4 w-px ${theme.border} flex-shrink-0`}></div>
+
+          {/* Quick Phrase Buttons */}
+          {quickPhrases.map(qp => (
+            <button
+              key={qp.label}
+              type="button"
+              onClick={() => {
+                insertFilter(`o:"${qp.phrase}"`)
+                onSearch(`o:"${qp.phrase}"`)
+              }}
+              className={`flex-shrink-0 px-2.5 py-1.5 text-xs ${theme.bgTertiary} rounded-lg hover:bg-blue-600 hover:text-white transition-colors whitespace-nowrap`}
+            >
+              {qp.label}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('phrases'); setShowHelper(true) }}
+            className={`flex-shrink-0 px-2.5 py-1.5 text-xs ${theme.textSecondary} hover:opacity-80 transition-colors whitespace-nowrap`}
+          >
+            More...
+          </button>
+        </div>
       </form>
 
       {showHelper && (
