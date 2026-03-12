@@ -10,6 +10,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
   const [showAllPrintings, setShowAllPrintings] = useState(true)
   const [inWatchlist, setInWatchlist] = useState(false)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
+  const [watchlistError, setWatchlistError] = useState(null)
 
   useEffect(() => {
     if (user && card) {
@@ -19,8 +20,13 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
 
   async function checkWatchlist() {
     if (!user || !card) return
-    const result = await isInWatchlist(user.uid, card.id)
-    setInWatchlist(result)
+    try {
+      const result = await isInWatchlist(user.uid, card.id)
+      setInWatchlist(result)
+    } catch (e) {
+      console.error('Check watchlist error:', e)
+      // Silently fail - just means we can't tell if it's already tracked
+    }
   }
 
   if (!card) return null
@@ -52,16 +58,26 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     }
 
     setWatchlistLoading(true)
+    setWatchlistError(null)
     try {
+      // Add a timeout so the button doesn't stay stuck forever
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out')), 10000)
+      )
+
       if (inWatchlist) {
-        await removeFromWatchlist(user.uid, card.id)
+        await Promise.race([removeFromWatchlist(user.uid, card.id), timeout])
         setInWatchlist(false)
       } else {
-        await addToWatchlist(user.uid, card)
+        await Promise.race([addToWatchlist(user.uid, card), timeout])
         setInWatchlist(true)
       }
     } catch (e) {
       console.error('Watchlist error:', e)
+      const msg = e.code === 'permission-denied'
+        ? 'Firestore rules block priceOracleUsers. Update your security rules.'
+        : e.message || 'Failed to update watchlist'
+      setWatchlistError(msg)
     }
     setWatchlistLoading(false)
   }
@@ -191,6 +207,9 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
                 <span>{inWatchlist ? '✓' : '◆'}</span>
                 {watchlistLoading ? 'Saving...' : inWatchlist ? 'In Watchlist' : 'Track Price'}
               </button>
+              {watchlistError && (
+                <p className="text-red-400 text-xs mt-1 max-w-[300px] text-center">{watchlistError}</p>
+              )}
             </div>
 
             {/* Right Column - Card Details */}
