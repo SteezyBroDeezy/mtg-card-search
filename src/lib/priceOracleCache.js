@@ -6,43 +6,51 @@ import {
 
 // Cache key for storing last sync time
 const CACHE_KEY = 'priceOracleCache'
-const SYNC_INTERVAL = 5 * 60 * 1000 // 5 minutes
+const SYNC_INTERVAL = 60 * 60 * 1000 // 1 HOUR (increased from 5 min)
 
 // In-memory cache for current session
 let memoryCache = null
 let lastSyncTime = 0
 let pendingChanges = false
+let currentUserId = null
 
-// Initialize cache from IndexedDB
+// Initialize cache from IndexedDB (OFFLINE-FIRST: doesn't auto-fetch from Firebase)
 export async function initPriceOracleCache(userId) {
   if (!userId) return null
+  currentUserId = userId
 
   try {
     // Try to load from IndexedDB first
     const cached = await db.meta.get(CACHE_KEY)
-    if (cached?.value) {
+    if (cached?.value && cached.value.userId === userId) {
       memoryCache = cached.value.data
       lastSyncTime = cached.value.timestamp
-
-      // If cache is fresh (less than 5 min old), use it
-      if (Date.now() - lastSyncTime < SYNC_INTERVAL) {
-        return memoryCache
-      }
+      console.log('Loaded Price Oracle data from local cache')
+      return memoryCache
     }
 
-    // Cache is stale or doesn't exist, fetch from Firebase
-    return await refreshFromFirebase(userId)
+    // No local cache for this user - initialize empty and let user sync manually
+    memoryCache = { watchlist: [], alerts: [] }
+
+    // Only auto-fetch from Firebase on FIRST load (no local data exists)
+    if (!cached?.value) {
+      console.log('No local cache found, fetching from Firebase...')
+      return await refreshFromFirebase(userId)
+    }
+
+    return memoryCache
   } catch (e) {
     console.error('Error initializing price oracle cache:', e)
     return memoryCache || { watchlist: [], alerts: [] }
   }
 }
 
-// Force refresh from Firebase (call sparingly!)
+// Force refresh from Firebase (MANUAL SYNC ONLY - call sparingly!)
 export async function refreshFromFirebase(userId) {
   if (!userId) return null
 
   try {
+    console.log('Syncing Price Oracle data from Firebase...')
     const data = await getPriceOracleData(userId)
     memoryCache = data
     lastSyncTime = Date.now()
@@ -58,11 +66,60 @@ export async function refreshFromFirebase(userId) {
     })
 
     pendingChanges = false
+    console.log('Price Oracle sync complete')
     return memoryCache
   } catch (e) {
     console.error('Error refreshing from Firebase:', e)
     // Return cached data if available
     return memoryCache || { watchlist: [], alerts: [] }
+  }
+}
+
+// Push local changes to Firebase (MANUAL SYNC ONLY)
+export async function pushToFirebase(userId) {
+  if (!userId || !memoryCache) return { success: false, error: 'No data to sync' }
+
+  try {
+    console.log('Pushing Price Oracle data to Firebase...')
+    await savePriceOracleData(userId, memoryCache)
+    pendingChanges = false
+    lastSyncTime = Date.now()
+
+    // Update IndexedDB with new sync time
+    await db.meta.put({
+      key: CACHE_KEY,
+      value: {
+        data: memoryCache,
+        timestamp: lastSyncTime,
+        userId
+      }
+    })
+
+    console.log('Price Oracle push complete')
+    return { success: true }
+  } catch (e) {
+    console.error('Failed to push to Firebase:', e)
+    return { success: false, error: e.message }
+  }
+}
+
+// Full sync: pull from Firebase, merge, push back
+export async function fullSync(userId) {
+  if (!userId) return { success: false, error: 'Not logged in' }
+
+  try {
+    // First push any local changes
+    if (pendingChanges) {
+      await pushToFirebase(userId)
+    }
+
+    // Then pull latest from Firebase
+    await refreshFromFirebase(userId)
+
+    return { success: true }
+  } catch (e) {
+    console.error('Full sync failed:', e)
+    return { success: false, error: e.message }
   }
 }
 
@@ -77,7 +134,21 @@ export function isInWatchlistCached(cardId) {
   return memoryCache.watchlist.some(c => c.id === cardId)
 }
 
-// Add to watchlist (updates cache immediately, syncs to Firebase in background)
+// Save to local cache only (NO Firebase call)
+async function saveToLocalCache() {
+  if (!memoryCache || !currentUserId) return
+
+  await db.meta.put({
+    key: CACHE_KEY,
+    value: {
+      data: memoryCache,
+      timestamp: lastSyncTime,
+      userId: currentUserId
+    }
+  })
+}
+
+// Add to watchlist (LOCAL ONLY - no auto Firebase sync)
 export async function addToWatchlistCached(userId, card) {
   if (!userId || !memoryCache) return false
 
@@ -102,45 +173,23 @@ export async function addToWatchlistCached(userId, card) {
   memoryCache.watchlist = [...(memoryCache.watchlist || []), watchlistCard]
   pendingChanges = true
 
-  // Save to IndexedDB immediately
-  await db.meta.put({
-    key: CACHE_KEY,
-    value: {
-      data: memoryCache,
-      timestamp: lastSyncTime,
-      userId
-    }
-  })
-
-  // Sync to Firebase in background (don't await)
-  syncToFirebase(userId).catch(e => console.error('Background sync failed:', e))
+  // Save to IndexedDB only (NO Firebase)
+  await saveToLocalCache()
 
   return true
 }
 
-// Remove from watchlist (updates cache immediately, syncs to Firebase in background)
+// Remove from watchlist (LOCAL ONLY - no auto Firebase sync)
 export async function removeFromWatchlistCached(userId, cardId) {
   if (!userId || !memoryCache) return
 
-  // Update memory cache immediately
   memoryCache.watchlist = (memoryCache.watchlist || []).filter(c => c.id !== cardId)
   pendingChanges = true
 
-  // Save to IndexedDB immediately
-  await db.meta.put({
-    key: CACHE_KEY,
-    value: {
-      data: memoryCache,
-      timestamp: lastSyncTime,
-      userId
-    }
-  })
-
-  // Sync to Firebase in background
-  syncToFirebase(userId).catch(e => console.error('Background sync failed:', e))
+  await saveToLocalCache()
 }
 
-// Add alert (updates cache immediately, syncs to Firebase in background)
+// Add alert (LOCAL ONLY - no auto Firebase sync)
 export async function addAlertCached(userId, alert) {
   if (!userId || !memoryCache) return null
 
@@ -154,40 +203,22 @@ export async function addAlertCached(userId, alert) {
   memoryCache.alerts = [...(memoryCache.alerts || []), newAlert]
   pendingChanges = true
 
-  await db.meta.put({
-    key: CACHE_KEY,
-    value: {
-      data: memoryCache,
-      timestamp: lastSyncTime,
-      userId
-    }
-  })
-
-  syncToFirebase(userId).catch(e => console.error('Background sync failed:', e))
+  await saveToLocalCache()
 
   return newAlert.id
 }
 
-// Remove alert
+// Remove alert (LOCAL ONLY)
 export async function removeAlertCached(userId, alertId) {
   if (!userId || !memoryCache) return
 
   memoryCache.alerts = (memoryCache.alerts || []).filter(a => a.id !== alertId)
   pendingChanges = true
 
-  await db.meta.put({
-    key: CACHE_KEY,
-    value: {
-      data: memoryCache,
-      timestamp: lastSyncTime,
-      userId
-    }
-  })
-
-  syncToFirebase(userId).catch(e => console.error('Background sync failed:', e))
+  await saveToLocalCache()
 }
 
-// Toggle alert
+// Toggle alert (LOCAL ONLY)
 export async function toggleAlertCached(userId, alertId) {
   if (!userId || !memoryCache) return
 
@@ -196,40 +227,7 @@ export async function toggleAlertCached(userId, alertId) {
   )
   pendingChanges = true
 
-  await db.meta.put({
-    key: CACHE_KEY,
-    value: {
-      data: memoryCache,
-      timestamp: lastSyncTime,
-      userId
-    }
-  })
-
-  syncToFirebase(userId).catch(e => console.error('Background sync failed:', e))
-}
-
-// Sync pending changes to Firebase
-async function syncToFirebase(userId) {
-  if (!userId || !memoryCache || !pendingChanges) return
-
-  try {
-    await savePriceOracleData(userId, memoryCache)
-    pendingChanges = false
-    lastSyncTime = Date.now()
-
-    // Update IndexedDB with new sync time
-    await db.meta.put({
-      key: CACHE_KEY,
-      value: {
-        data: memoryCache,
-        timestamp: lastSyncTime,
-        userId
-      }
-    })
-  } catch (e) {
-    console.error('Failed to sync to Firebase:', e)
-    // Changes are still in local cache, will retry on next action
-  }
+  await saveToLocalCache()
 }
 
 // Check if there are pending changes
@@ -242,10 +240,16 @@ export function getLastSyncTime() {
   return lastSyncTime
 }
 
+// Check if cache is stale (more than 1 hour old)
+export function isCacheStale() {
+  return Date.now() - lastSyncTime > SYNC_INTERVAL
+}
+
 // Clear cache (on logout)
 export async function clearPriceOracleCache() {
   memoryCache = null
   lastSyncTime = 0
   pendingChanges = false
+  currentUserId = null
   await db.meta.delete(CACHE_KEY)
 }

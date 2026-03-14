@@ -9,7 +9,7 @@ import { defineConfig } from 'vite'
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: ['favicon.ico'],
         manifest: {
           name: 'MTG Card Search',

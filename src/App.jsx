@@ -13,7 +13,12 @@ import { parseSearch, matchesFilters } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
-import { initPriceOracleCache, clearPriceOracleCache } from './lib/priceOracleCache'
+import {
+  initPriceOracleCache,
+  clearPriceOracleCache,
+  fullSync as syncPriceOracle,
+  hasPendingChanges as hasPriceOraclePending
+} from './lib/priceOracleCache'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 function App() {
@@ -93,8 +98,9 @@ function App() {
   }, [])
 
   async function checkSyncStatus() {
-    const unsynced = await hasUnsyncedChanges()
-    setHasUnsynced(unsynced)
+    const listUnsynced = await hasUnsyncedChanges()
+    const priceOracleUnsynced = hasPriceOraclePending()
+    setHasUnsynced(listUnsynced || priceOracleUnsynced)
     const syncTime = await getLastSyncTime()
     setLastSyncTime(syncTime)
   }
@@ -103,11 +109,19 @@ function App() {
     if (!user) return
     setSyncing(true)
     try {
-      const result = await syncLists(user.uid)
-      if (result.success) {
+      // Sync both lists AND price oracle data
+      const [listResult, priceResult] = await Promise.all([
+        syncLists(user.uid),
+        syncPriceOracle(user.uid)
+      ])
+
+      if (listResult.success && priceResult.success) {
         await checkSyncStatus()
       } else {
-        alert('Sync failed: ' + result.error)
+        const errors = []
+        if (!listResult.success) errors.push('Lists: ' + listResult.error)
+        if (!priceResult.success) errors.push('Price Oracle: ' + priceResult.error)
+        alert('Sync issues: ' + errors.join(', '))
       }
     } catch (err) {
       console.error('Sync failed:', err)

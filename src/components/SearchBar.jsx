@@ -62,11 +62,21 @@ function SearchBar({ onSearch, theme }) {
       }
 
       try {
-        const results = await db.cards
+        // First try startsWithIgnoreCase (faster, indexed)
+        let results = await db.cards
           .where('name')
           .startsWithIgnoreCase(trimmed)
           .limit(8)
           .toArray()
+
+        // If no results, fall back to contains search
+        if (results.length === 0) {
+          const lowerTrimmed = trimmed.toLowerCase()
+          results = await db.cards
+            .filter(card => card.name.toLowerCase().includes(lowerTrimmed))
+            .limit(8)
+            .toArray()
+        }
 
         // Get unique card names
         const uniqueNames = [...new Set(results.map(c => c.name))].slice(0, 6)
@@ -392,18 +402,22 @@ function SearchBar({ onSearch, theme }) {
             <div
               ref={suggestionsRef}
               className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden`}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
             >
               {suggestions.map((name, idx) => (
-                <button
+                <div
                   key={name}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSuggestionClick(name)}
-                  className={`w-full px-4 py-2 text-left hover:bg-blue-600/30 transition-colors ${
+                  onKeyDown={(e) => e.key === 'Enter' && handleSuggestionClick(name)}
+                  className={`w-full px-4 py-3 text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer ${
                     idx === selectedSuggestionIndex ? 'bg-blue-600/40' : ''
                   } ${theme.text}`}
                 >
                   {name}
-                </button>
+                </div>
               ))}
             </div>
           )}
