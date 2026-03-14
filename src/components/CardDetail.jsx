@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import SaveToListModal from './SaveToListModal'
-import { addToWatchlist, isInWatchlist, removeFromWatchlist } from '../lib/firebase'
+import {
+  isInWatchlistCached,
+  addToWatchlistCached,
+  removeFromWatchlistCached
+} from '../lib/priceOracleCache'
 
-function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }) {
+function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, theme, onListUpdated }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [currentFace, setCurrentFace] = useState(0)
   const [isFlipping, setIsFlipping] = useState(false)
@@ -14,20 +18,10 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
 
   useEffect(() => {
     if (user && card) {
-      checkWatchlist()
+      // Use cached check - NO Firebase call!
+      setInWatchlist(isInWatchlistCached(card.id))
     }
   }, [user, card])
-
-  async function checkWatchlist() {
-    if (!user || !card) return
-    try {
-      const result = await isInWatchlist(user.uid, card.id)
-      setInWatchlist(result)
-    } catch (e) {
-      console.error('Check watchlist error:', e)
-      // Silently fail - just means we can't tell if it's already tracked
-    }
-  }
 
   if (!card) return null
 
@@ -60,16 +54,11 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     setWatchlistLoading(true)
     setWatchlistError(null)
     try {
-      // Add a timeout so the button doesn't stay stuck forever
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out')), 10000)
-      )
-
       if (inWatchlist) {
-        await Promise.race([removeFromWatchlist(user.uid, card.id), timeout])
+        await removeFromWatchlistCached(user.uid, card.id)
         setInWatchlist(false)
       } else {
-        await Promise.race([addToWatchlist(user.uid, card), timeout])
+        await addToWatchlistCached(user.uid, card)
         setInWatchlist(true)
       }
     } catch (e) {
@@ -107,9 +96,11 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
     return { price: 'No price', type: '' }
   }
 
-  // Get current display values
+  // Get current display values - handle both local DB format and Scryfall API format
   const displayImage = activeFace?.image_large || activeFace?.image_normal ||
-                       card.image_large || card.image_normal
+                       activeFace?.image_uris?.large || activeFace?.image_uris?.normal ||
+                       card.image_large || card.image_normal ||
+                       card.image_uris?.large || card.image_uris?.normal
   const displayName = activeFace?.name || card.name
   const displayType = activeFace?.type_line || card.type_line
   const displayManaCost = activeFace?.mana_cost || card.mana_cost
@@ -474,7 +465,11 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user }
         <SaveToListModal
           card={card}
           userId={user.uid}
-          onClose={() => setShowSaveModal(false)}
+          onClose={() => {
+            setShowSaveModal(false)
+            if (onListUpdated) onListUpdated()
+          }}
+          theme={theme}
         />
       )}
     </>

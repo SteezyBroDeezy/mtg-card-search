@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
-  getPriceOracleData,
-  addToWatchlist,
-  removeFromWatchlist,
-  addPriceAlert,
-  removePriceAlert,
-  togglePriceAlert,
-  savePriceOracleData
-} from '../lib/firebase'
+  getCachedPriceOracleData,
+  removeFromWatchlistCached,
+  addAlertCached,
+  removeAlertCached,
+  toggleAlertCached
+} from '../lib/priceOracleCache'
 
 const SCRYFALL_API = 'https://api.scryfall.com'
 
@@ -96,7 +94,8 @@ function PriceOracle({ user, theme, onCardClick }) {
 
   async function loadData() {
     try {
-      const data = await getPriceOracleData(user.uid)
+      // Use cached data - NO Firebase call!
+      const data = getCachedPriceOracleData()
       setWatchlist(data.watchlist || [])
       setAlerts(data.alerts || [])
     } catch (e) {
@@ -156,7 +155,7 @@ function PriceOracle({ user, theme, onCardClick }) {
 
   async function handleRemoveFromWatchlist(cardId) {
     if (!user) return
-    await removeFromWatchlist(user.uid, cardId)
+    await removeFromWatchlistCached(user.uid, cardId)
     setWatchlist(prev => prev.filter(c => c.id !== cardId))
   }
 
@@ -193,14 +192,15 @@ function PriceOracle({ user, theme, onCardClick }) {
       scope: alertForm.cardId ? 'specific' : 'watchlist'
     }
 
-    await addPriceAlert(user.uid, alert)
-    await loadData()
+    const newAlertId = await addAlertCached(user.uid, alert)
+    // Update local state with the new alert
+    setAlerts(prev => [...prev, { ...alert, id: newAlertId, enabled: true, created: new Date().toISOString() }])
     setShowAlertModal(false)
   }
 
   async function handleToggleAlert(alertId) {
     if (!user) return
-    await togglePriceAlert(user.uid, alertId)
+    await toggleAlertCached(user.uid, alertId)
     setAlerts(prev => prev.map(a =>
       a.id === alertId ? { ...a, enabled: !a.enabled } : a
     ))
@@ -208,7 +208,7 @@ function PriceOracle({ user, theme, onCardClick }) {
 
   async function handleDeleteAlert(alertId) {
     if (!user) return
-    await removePriceAlert(user.uid, alertId)
+    await removeAlertCached(user.uid, alertId)
     setAlerts(prev => prev.filter(a => a.id !== alertId))
   }
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import SearchBar from './components/SearchBar'
 import CardDetail from './components/CardDetail'
+import QuickCardView from './components/QuickCardView'
+import SaveToListModal from './components/SaveToListModal'
 import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
 import Settings from './components/Settings'
@@ -10,6 +12,9 @@ import { downloadCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
+import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
+import { initPriceOracleCache, clearPriceOracleCache } from './lib/priceOracleCache'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 
 function App() {
   const [dbStatus, setDbStatus] = useState('checking')
@@ -38,6 +43,24 @@ function App() {
     const saved = localStorage.getItem('mtg-group-by-name')
     return saved !== null ? saved === 'true' : true // default to true
   })
+  const [syncing, setSyncing] = useState(false)
+  const [hasUnsynced, setHasUnsynced] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState(null)
+  const [quickViewCard, setQuickViewCard] = useState(null)
+  const [showQuickSaveModal, setShowQuickSaveModal] = useState(false)
+
+  // PWA Update handling
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      console.log('SW Registered:', r)
+    },
+    onRegisterError(error) {
+      console.log('SW registration error:', error)
+    },
+  })
 
   const theme = themes[currentTheme]
 
@@ -55,11 +78,59 @@ function App() {
   useEffect(() => {
     checkDatabase()
     requestPersistentStorage()
-    const unsubscribe = onAuthChange((user) => {
+    const unsubscribe = onAuthChange(async (user) => {
       setUser(user)
+      if (user) {
+        // Initialize price oracle cache ONCE on login (saves tons of Firebase reads)
+        await initPriceOracleCache(user.uid)
+        checkSyncStatus()
+      } else {
+        // Clear cache on logout
+        clearPriceOracleCache()
+      }
     })
     return () => unsubscribe()
   }, [])
+
+  async function checkSyncStatus() {
+    const unsynced = await hasUnsyncedChanges()
+    setHasUnsynced(unsynced)
+    const syncTime = await getLastSyncTime()
+    setLastSyncTime(syncTime)
+  }
+
+  async function handleListSync() {
+    if (!user) return
+    setSyncing(true)
+    try {
+      const result = await syncLists(user.uid)
+      if (result.success) {
+        await checkSyncStatus()
+      } else {
+        alert('Sync failed: ' + result.error)
+      }
+    } catch (err) {
+      console.error('Sync failed:', err)
+      alert('Sync failed: ' + err.message)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  function formatSyncTime(isoString) {
+    if (!isoString) return 'Never'
+    const date = new Date(isoString)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    return `${diffDays}d ago`
+  }
 
   useEffect(() => {
     localStorage.setItem('mtg-group-by-name', groupByName.toString())
@@ -289,7 +360,15 @@ function App() {
     setDisplayCount(newCount)
   }
 
-  async function handleCardClick(card) {
+  function handleCardClick(card) {
+    // Show quick view immediately (no async wait)
+    setQuickViewCard(card)
+  }
+
+  async function handleViewFullDetails(card) {
+    // Close quick view and open full details
+    setQuickViewCard(null)
+
     // If grouped, we already have all printings
     if (card._allPrintings) {
       setAllPrintings(card._allPrintings)
@@ -377,6 +456,36 @@ function App() {
 
             {user ? (
               <>
+                {/* Sync Button - Prominent when there are unsynced changes */}
+                <button
+                  onClick={handleListSync}
+                  disabled={syncing}
+                  className={`flex items-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    syncing
+                      ? 'bg-gray-600 text-gray-400 cursor-wait'
+                      : hasUnsynced
+                      ? 'bg-yellow-600 hover:bg-yellow-500 text-white animate-pulse'
+                      : 'bg-green-700/50 hover:bg-green-600 text-green-300'
+                  }`}
+                  title={hasUnsynced ? 'Sync pending changes' : `Last synced: ${formatSyncTime(lastSyncTime)}`}
+                >
+                  <svg
+                    className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {syncing ? 'Syncing...' : hasUnsynced ? 'Sync' : 'Synced'}
+                  </span>
+                </button>
                 <button
                   onClick={() => setShowLists(true)}
                   className={`p-2 sm:px-3 sm:py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
@@ -503,8 +612,11 @@ function App() {
               {searchResults.map(card => (
                 <div
                   key={card.id}
-                  className="group cursor-pointer relative"
+                  role="button"
+                  tabIndex={0}
+                  className="group cursor-pointer relative active:scale-95 transition-transform"
                   onClick={() => handleCardClick(card)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCardClick(card)}
                 >
                   {(card.image_normal || card.image_small) ? (
                     <img
@@ -512,6 +624,7 @@ function App() {
                       alt={card.name}
                       className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
                       loading="lazy"
+                      draggable={false}
                     />
                   ) : (
                     <div className={`w-full aspect-[488/680] ${theme.bgSecondary} rounded-lg flex items-center justify-center`}>
@@ -608,6 +721,49 @@ function App() {
         )}
       </main>
 
+      {/* PWA Update Banner */}
+      {needRefresh && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-blue-600 text-white p-4 rounded-xl shadow-2xl z-[100] animate-bounce">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Update Available!</p>
+              <p className="text-sm text-blue-100">Tap to get the latest version</p>
+            </div>
+            <button
+              onClick={() => updateServiceWorker(true)}
+              className="px-4 py-2 bg-white text-blue-600 rounded-lg font-bold text-sm whitespace-nowrap"
+            >
+              Update Now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Card View - shows immediately when tapping a card */}
+      {quickViewCard && (
+        <QuickCardView
+          card={quickViewCard}
+          user={user}
+          theme={theme}
+          onClose={() => setQuickViewCard(null)}
+          onViewDetails={() => handleViewFullDetails(quickViewCard)}
+          onSaveToList={() => setShowQuickSaveModal(true)}
+        />
+      )}
+
+      {/* Save modal from quick view */}
+      {showQuickSaveModal && quickViewCard && user && (
+        <SaveToListModal
+          card={quickViewCard}
+          userId={user.uid}
+          onClose={() => {
+            setShowQuickSaveModal(false)
+            checkSyncStatus()
+          }}
+          theme={theme}
+        />
+      )}
+
       {selectedCard && (
         <CardDetail
           card={selectedCard}
@@ -618,6 +774,8 @@ function App() {
           }}
           onSelectPrinting={(card) => setSelectedCard(card)}
           user={user}
+          theme={theme}
+          onListUpdated={checkSyncStatus}
         />
       )}
 
@@ -626,7 +784,7 @@ function App() {
       )}
 
       {showLists && user && (
-        <MyLists userId={user.uid} onClose={() => setShowLists(false)} />
+        <MyLists userId={user.uid} onClose={() => { setShowLists(false); checkSyncStatus(); }} />
       )}
 
       {showSettings && (

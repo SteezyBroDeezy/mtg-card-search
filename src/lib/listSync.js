@@ -56,12 +56,16 @@ export async function addCardToListLocal(listId, card, note = '') {
     return existing
   }
 
+  // Handle both local DB format (image_small) and Scryfall API format (image_uris.small)
+  const imageSmall = card.image_small || card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small
+  const imageNormal = card.image_normal || card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal
+
   const listCard = {
     listId,
     cardId: card.id,
     name: card.name,
-    image_small: card.image_small,
-    image_normal: card.image_normal,
+    image_small: imageSmall,
+    image_normal: imageNormal,
     note,
     addedAt: new Date().toISOString(),
     synced: false
