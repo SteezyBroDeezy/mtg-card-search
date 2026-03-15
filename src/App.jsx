@@ -444,8 +444,8 @@ function App() {
   }
 
   function handleCardClick(card) {
-    // Show quick view immediately (no async wait)
-    setQuickViewCard(card)
+    // Go directly to full card detail view (skip quick view)
+    handleViewFullDetails(card)
   }
 
   async function handleViewFullDetails(card) {
@@ -810,19 +810,19 @@ function App() {
                       </button>
                     )}
 
-                    {/* Versions count - bottom left */}
-                    {card._printingCount > 1 && (
-                      <div className="absolute bottom-2 left-2 bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
-                        {card._printingCount}v
-                      </div>
-                    )}
-
-                    {/* Price badge - bottom center */}
-                    {card.prices?.usd && (
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
-                        ${card.prices.usd}
-                      </div>
-                    )}
+                    {/* Price and versions badges - bottom center together */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
+                      {card._printingCount > 1 && (
+                        <div className="bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
+                          {card._printingCount}v
+                        </div>
+                      )}
+                      {card.prices?.usd && (
+                        <div className="bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
+                          ${card.prices.usd}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               })}

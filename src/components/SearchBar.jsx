@@ -66,7 +66,7 @@ function SearchBar({ onSearch, theme }) {
         let results = await db.cards
           .where('name')
           .startsWithIgnoreCase(trimmed)
-          .limit(8)
+          .limit(20)
           .toArray()
 
         // If no results, fall back to contains search
@@ -74,12 +74,12 @@ function SearchBar({ onSearch, theme }) {
           const lowerTrimmed = trimmed.toLowerCase()
           results = await db.cards
             .filter(card => card.name.toLowerCase().includes(lowerTrimmed))
-            .limit(8)
+            .limit(20)
             .toArray()
         }
 
-        // Get unique card names
-        const uniqueNames = [...new Set(results.map(c => c.name))].slice(0, 6)
+        // Get unique card names - show up to 12 suggestions
+        const uniqueNames = [...new Set(results.map(c => c.name))].slice(0, 12)
         setSuggestions(uniqueNames)
         setShowSuggestions(uniqueNames.length > 0)
         setSelectedSuggestionIndex(-1)

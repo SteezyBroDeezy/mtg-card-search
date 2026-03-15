@@ -120,25 +120,25 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+        className="fixed inset-0 bg-black/90 flex items-start justify-center p-2 sm:p-4 z-50 overflow-y-auto"
         onClick={onClose}
       >
         <div
-          className="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-gray-800 rounded-xl max-w-4xl w-full my-2 sm:my-4"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-center p-4 border-b border-gray-700">
-            <h2 className="text-xl font-bold">{card.name}</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">
+          <div className="flex justify-between items-center p-3 sm:p-4 border-b border-gray-700 sticky top-0 bg-gray-800 z-10">
+            <h2 className="text-lg sm:text-xl font-bold truncate pr-2">{card.name}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl flex-shrink-0">
               &times;
             </button>
           </div>
 
-          <div className="p-4 flex flex-col lg:flex-row gap-6">
-            {/* Left Column - Card Image */}
-            <div className="flex-shrink-0 flex flex-col items-center">
+          <div className="p-3 sm:p-4 flex flex-col lg:flex-row gap-4 sm:gap-6">
+            {/* Left Column - Card Image - Full width on mobile */}
+            <div className="flex-shrink-0 flex flex-col items-center w-full lg:w-auto">
               <div
-                className={`relative cursor-pointer transition-transform duration-150 ${
+                className={`relative cursor-pointer transition-transform duration-150 w-full max-w-[350px] sm:max-w-[300px] mx-auto ${
                   isFlipping ? 'scale-95 opacity-80' : ''
                 } ${hasMultipleFaces ? 'hover:scale-105' : ''}`}
                 onClick={hasMultipleFaces ? flipCard : undefined}
@@ -147,10 +147,10 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
                   <img
                     src={displayImage}
                     alt={displayName}
-                    className="w-full max-w-[300px] rounded-lg shadow-xl"
+                    className="w-full rounded-lg shadow-xl"
                   />
                 ) : (
-                  <div className="w-full max-w-[300px] aspect-[488/680] bg-gray-700 rounded-lg flex items-center justify-center">
+                  <div className="w-full aspect-[488/680] bg-gray-700 rounded-lg flex items-center justify-center">
                     <span className="text-gray-500">No image</span>
                   </div>
                 )}
