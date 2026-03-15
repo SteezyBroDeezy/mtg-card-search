@@ -7,6 +7,7 @@ import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
 import Settings from './components/Settings'
 import PriceOracle from './components/PriceOracle'
+import SyntaxHelp from './components/SyntaxHelp'
 import { hasCards, getDbInfo, db } from './lib/db'
 import { downloadCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
@@ -675,6 +676,9 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Collapsible Syntax Help */}
+            <SyntaxHelp theme={theme} onSearch={handleSearch} />
 
             {/* Results count */}
             {allResults.length > 0 && (
