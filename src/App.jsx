@@ -53,6 +53,11 @@ function App() {
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [quickViewCard, setQuickViewCard] = useState(null)
   const [showQuickSaveModal, setShowQuickSaveModal] = useState(false)
+  const [useScryfall, setUseScryfall] = useState(() => {
+    const saved = localStorage.getItem('mtg-use-scryfall')
+    return saved === 'true'
+  })
+  const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
 
   // PWA Update handling
   const {
@@ -258,9 +263,39 @@ function App() {
     return grouped
   }
 
+  // Search Scryfall API directly (for otag: and other API-only features)
+  async function searchScryfall(query) {
+    const SCRYFALL_API = 'https://api.scryfall.com'
+    try {
+      const response = await fetch(
+        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards`
+      )
+      const data = await response.json()
+      if (data.object === 'error') {
+        console.error('Scryfall error:', data.details)
+        return []
+      }
+      if (data.data) {
+        // Transform Scryfall results to match our local card format
+        return data.data.map(card => ({
+          ...card,
+          image_small: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small,
+          image_normal: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal,
+          image_large: card.image_uris?.large || card.card_faces?.[0]?.image_uris?.large,
+          image_art_crop: card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop
+        }))
+      }
+      return []
+    } catch (err) {
+      console.error('Scryfall API error:', err)
+      return []
+    }
+  }
+
   async function handleSearch(query) {
     setLastQuery(query)
     setSearchError(null)
+    setSearchSource(null)
 
     if (!query.trim()) {
       setSearchResults([])
@@ -269,20 +304,30 @@ function App() {
       return
     }
 
-    const { filters, nameSearch } = parseSearch(query)
+    const { filters, nameSearch, requiresScryfall } = parseSearch(query)
+
+    // Determine if we should use Scryfall API
+    const shouldUseScryfall = useScryfall || requiresScryfall
 
     let results
     try {
-      if (filters.length === 0 && nameSearch) {
-        results = await db.cards
-          .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
-          .limit(500)
-          .toArray()
+      // Use Scryfall API if toggle is on or query requires it
+      if (shouldUseScryfall) {
+        setSearchSource('scryfall')
+        results = await searchScryfall(query)
       } else {
-        results = await db.cards
-          .filter(card => matchesFilters(card, filters, nameSearch))
-          .limit(500)
-          .toArray()
+        setSearchSource('local')
+        if (filters.length === 0 && nameSearch) {
+          results = await db.cards
+            .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
+            .limit(500)
+            .toArray()
+        } else {
+          results = await db.cards
+            .filter(card => matchesFilters(card, filters, nameSearch))
+            .limit(500)
+            .toArray()
+        }
       }
     } catch (err) {
       console.error('Search error:', err)
@@ -598,27 +643,53 @@ function App() {
           <>
             <div className="mb-6">
               <SearchBar onSearch={handleSearch} theme={theme} />
-              <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
                 <p className={`${theme.textSecondary} text-sm`}>
                   {cardCount.toLocaleString()} cards in database
                 </p>
-                <label className={`flex items-center gap-2 text-sm ${theme.textSecondary}`}>
-                  <input
-                    type="checkbox"
-                    checked={groupByName}
-                    onChange={(e) => setGroupByName(e.target.checked)}
-                    className="rounded"
-                  />
-                  Group by name
-                </label>
+                <div className="flex items-center gap-4">
+                  <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
+                    <input
+                      type="checkbox"
+                      checked={useScryfall}
+                      onChange={(e) => {
+                        setUseScryfall(e.target.checked)
+                        localStorage.setItem('mtg-use-scryfall', e.target.checked)
+                      }}
+                      className="rounded accent-purple-500"
+                    />
+                    <span className="flex items-center gap-1">
+                      Use Scryfall API
+                      <span className="text-xs text-purple-400">(full syntax)</span>
+                    </span>
+                  </label>
+                  <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
+                    <input
+                      type="checkbox"
+                      checked={groupByName}
+                      onChange={(e) => setGroupByName(e.target.checked)}
+                      className="rounded"
+                    />
+                    Group by name
+                  </label>
+                </div>
               </div>
             </div>
 
             {/* Results count */}
             {allResults.length > 0 && (
-              <p className={`${theme.textSecondary} text-sm mb-4`}>
-                Showing {searchResults.length} of {allResults.length} results
-                {allResults.length >= 500 && ' (limit reached)'}
+              <p className={`${theme.textSecondary} text-sm mb-4 flex items-center gap-2`}>
+                <span>Showing {searchResults.length} of {allResults.length} results</span>
+                {allResults.length >= 500 && <span>(limit reached)</span>}
+                {searchSource && (
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    searchSource === 'scryfall'
+                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                      : 'bg-gray-600/30 text-gray-400'
+                  }`}>
+                    via {searchSource === 'scryfall' ? 'Scryfall API' : 'Local DB'}
+                  </span>
+                )}
               </p>
             )}
 

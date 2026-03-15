@@ -7,63 +7,12 @@ import {
   toggleAlertCached
 } from '../lib/priceOracleCache'
 
-const SCRYFALL_API = 'https://api.scryfall.com'
-
-// Trending categories with Scryfall queries - focused on budget & commander
-const trendingCategories = [
-  // Budget Categories
-  { id: 'super-budget', name: 'Super Budget (<$1)', icon: '🪙', query: 'usd<1 usd>0.25', order: 'edhrec', dir: 'desc', group: 'Budget' },
-  { id: 'under-2', name: 'Under $2', icon: '💵', query: 'usd<2 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Budget' },
-  { id: 'under-5', name: 'Under $5', icon: '💰', query: 'usd<5 usd>1', order: 'edhrec', dir: 'desc', group: 'Budget' },
-  { id: 'under-10', name: 'Under $10', icon: '💸', query: 'usd<10 usd>3', order: 'edhrec', dir: 'desc', group: 'Budget' },
-  { id: 'under-20', name: 'Under $20', icon: '💎', query: 'usd<20 usd>5', order: 'edhrec', dir: 'desc', group: 'Budget' },
-
-  // Commander Categories
-  { id: 'edh-staples', name: 'EDH Staples', icon: '👑', query: 'f:commander', order: 'edhrec', dir: 'desc', group: 'Commander' },
-  { id: 'edh-budget', name: 'EDH Budget (<$5)', icon: '🎯', query: 'f:commander usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Commander' },
-  { id: 'edh-mid', name: 'EDH Mid ($5-$20)', icon: '⚔️', query: 'f:commander usd<20 usd>5', order: 'edhrec', dir: 'desc', group: 'Commander' },
-  { id: 'commanders', name: 'Popular Commanders', icon: '🏰', query: 'is:commander', order: 'edhrec', dir: 'desc', group: 'Commander' },
-  { id: 'edh-new', name: 'New EDH Cards', icon: '✨', query: 'f:commander year>=2024', order: 'edhrec', dir: 'desc', group: 'Commander' },
-
-  // Recent Sets
-  { id: 'new-2025', name: '2025 Releases', icon: '🆕', query: 'year=2025', order: 'released', dir: 'desc', group: 'Sets' },
-  { id: 'new-2024', name: '2024 Cards', icon: '📅', query: 'year=2024', order: 'edhrec', dir: 'desc', group: 'Sets' },
-  { id: 'new-mythics', name: 'New Mythics', icon: '🌈', query: 'r:mythic year>=2024', order: 'released', dir: 'desc', group: 'Sets' },
-  { id: 'new-rares', name: 'New Rares', icon: '🔶', query: 'r:rare year>=2024', order: 'edhrec', dir: 'desc', group: 'Sets' },
-
-  // Card Types (Budget Focus)
-  { id: 'creatures-budget', name: 'Creatures (<$5)', icon: '🐉', query: 't:creature usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
-  { id: 'instants-budget', name: 'Instants (<$5)', icon: '⚡', query: 't:instant usd<5 usd>0.25', order: 'edhrec', dir: 'desc', group: 'Types' },
-  { id: 'sorceries-budget', name: 'Sorceries (<$5)', icon: '📜', query: 't:sorcery usd<5 usd>0.25', order: 'edhrec', dir: 'desc', group: 'Types' },
-  { id: 'enchantments-budget', name: 'Enchantments (<$5)', icon: '🔮', query: 't:enchantment usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
-  { id: 'artifacts-budget', name: 'Artifacts (<$5)', icon: '⚙️', query: 't:artifact usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
-  { id: 'lands-budget', name: 'Lands (<$10)', icon: '🏔️', query: 't:land usd<10 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Types' },
-
-  // Colors (Budget Focus)
-  { id: 'white-budget', name: 'White (<$5)', icon: '⬜', query: 'c:white usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
-  { id: 'blue-budget', name: 'Blue (<$5)', icon: '🔵', query: 'c:blue usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
-  { id: 'black-budget', name: 'Black (<$5)', icon: '⚫', query: 'c:black usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
-  { id: 'red-budget', name: 'Red (<$5)', icon: '🔴', query: 'c:red usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
-  { id: 'green-budget', name: 'Green (<$5)', icon: '🟢', query: 'c:green usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
-  { id: 'multicolor-budget', name: 'Multicolor (<$5)', icon: '🌀', query: 'c>=2 usd<5 usd>0.5', order: 'edhrec', dir: 'desc', group: 'Colors' },
-]
-
-// Group categories for display
-const categoryGroups = ['Budget', 'Commander', 'Sets', 'Types', 'Colors']
-
 function PriceOracle({ user, theme, onCardClick }) {
-  const [activeTab, setActiveTab] = useState('trending')
+  const [activeTab, setActiveTab] = useState('watchlist')
   const [watchlist, setWatchlist] = useState([])
   const [alerts, setAlerts] = useState([])
-  const [trending, setTrending] = useState([])
-  const [trendingCategory, setTrendingCategory] = useState('edh-staples')
-  const [trendingLoading, setTrendingLoading] = useState(false)
-  const [trendingLoadingMore, setTrendingLoadingMore] = useState(false)
-  const [nextPageUrl, setNextPageUrl] = useState(null)
-  const [totalLoaded, setTotalLoaded] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showAlertModal, setShowAlertModal] = useState(false)
-  const [selectedCard, setSelectedCard] = useState(null)
 
   // Alert form state
   const [alertForm, setAlertForm] = useState({
@@ -82,16 +31,6 @@ function PriceOracle({ user, theme, onCardClick }) {
     }
   }, [user])
 
-  useEffect(() => {
-    loadTrending(trendingCategory)
-  }, [])
-
-  useEffect(() => {
-    if (activeTab === 'trending') {
-      loadTrending(trendingCategory)
-    }
-  }, [trendingCategory])
-
   async function loadData() {
     try {
       // Use cached data - NO Firebase call!
@@ -102,55 +41,6 @@ function PriceOracle({ user, theme, onCardClick }) {
       console.error('Error loading Price Oracle data:', e)
     }
     setLoading(false)
-  }
-
-  async function loadTrending(categoryId, reset = true) {
-    const category = trendingCategories.find(c => c.id === categoryId) || trendingCategories[0]
-
-    if (reset) {
-      setTrendingLoading(true)
-      setTrending([])
-      setNextPageUrl(null)
-      setTotalLoaded(0)
-    }
-
-    try {
-      const response = await fetch(
-        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(category.query)}&order=${category.order}&dir=${category.dir}&unique=cards`
-      )
-      const data = await response.json()
-      if (data.data) {
-        setTrending(data.data)
-        setTotalLoaded(data.data.length)
-        setNextPageUrl(data.has_more ? data.next_page : null)
-      } else {
-        setTrending([])
-        setNextPageUrl(null)
-      }
-    } catch (e) {
-      console.error('Error loading trending:', e)
-      setTrending([])
-      setNextPageUrl(null)
-    }
-    setTrendingLoading(false)
-  }
-
-  async function loadMoreTrending() {
-    if (!nextPageUrl || trendingLoadingMore) return
-
-    setTrendingLoadingMore(true)
-    try {
-      const response = await fetch(nextPageUrl)
-      const data = await response.json()
-      if (data.data) {
-        setTrending(prev => [...prev, ...data.data])
-        setTotalLoaded(prev => prev + data.data.length)
-        setNextPageUrl(data.has_more ? data.next_page : null)
-      }
-    } catch (e) {
-      console.error('Error loading more:', e)
-    }
-    setTrendingLoadingMore(false)
   }
 
   async function handleRemoveFromWatchlist(cardId) {
@@ -212,13 +102,6 @@ function PriceOracle({ user, theme, onCardClick }) {
     setAlerts(prev => prev.filter(a => a.id !== alertId))
   }
 
-  function getPrice(card) {
-    if (card.prices?.usd) return `$${card.prices.usd}`
-    if (card.prices?.usd_foil) return `$${card.prices.usd_foil}`
-    if (card.priceStr) return card.priceStr
-    return 'N/A'
-  }
-
   function getCardImage(card) {
     return card.image || card.image_small || card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || ''
   }
@@ -255,11 +138,10 @@ function PriceOracle({ user, theme, onCardClick }) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-700 pb-2">
+      <div className="flex gap-2 border-b border-gray-700 pb-2 flex-wrap items-center">
         {[
           { id: 'watchlist', label: 'Watchlist', icon: '👁️', count: watchlist.length },
-          { id: 'alerts', label: 'Alerts', icon: '🔔', count: alerts.filter(a => a.enabled).length },
-          { id: 'trending', label: 'Trending', icon: '📈' }
+          { id: 'alerts', label: 'Alerts', icon: '🔔', count: alerts.filter(a => a.enabled).length }
         ].map(tab => (
           <button
             key={tab.id}
@@ -281,6 +163,16 @@ function PriceOracle({ user, theme, onCardClick }) {
             )}
           </button>
         ))}
+        <a
+          href="https://biggitybrolo.github.io/mtgpricetracker/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-black hover:from-yellow-400 hover:to-orange-400`}
+        >
+          <span>📈</span>
+          Go to Price Oracle
+          <span>→</span>
+        </a>
       </div>
 
       {/* Watchlist Tab */}
@@ -397,121 +289,6 @@ function PriceOracle({ user, theme, onCardClick }) {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Trending Tab */}
-      {activeTab === 'trending' && (
-        <div>
-          {/* Category Selector - Grouped */}
-          <div className="mb-6 space-y-4">
-            {categoryGroups.map(groupName => (
-              <div key={groupName}>
-                <p className={`${theme.textSecondary} text-xs uppercase tracking-wide mb-2`}>{groupName}</p>
-                <div className="flex flex-wrap gap-2">
-                  {trendingCategories.filter(c => c.group === groupName).map(category => (
-                    <button
-                      key={category.id}
-                      onClick={() => setTrendingCategory(category.id)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
-                        trendingCategory === category.id
-                          ? `${theme.accent} text-white scale-105`
-                          : `${theme.bgTertiary} ${theme.textSecondary} hover:opacity-80`
-                      }`}
-                    >
-                      <span>{category.icon}</span>
-                      <span>{category.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Current Category Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">
-                {trendingCategories.find(c => c.id === trendingCategory)?.icon}
-              </span>
-              <h3 className={`text-lg font-semibold ${theme.text}`}>
-                {trendingCategories.find(c => c.id === trendingCategory)?.name}
-              </h3>
-              {(trendingLoading || trendingLoadingMore) && (
-                <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
-              )}
-            </div>
-            {totalLoaded > 0 && (
-              <p className={`${theme.textSecondary} text-sm`}>
-                {totalLoaded} cards loaded
-              </p>
-            )}
-          </div>
-
-          {/* Cards Grid */}
-          {trendingLoading ? (
-            <div className={`py-12 text-center ${theme.textSecondary}`}>
-              <div className="animate-spin w-8 h-8 border-2 border-current border-t-transparent rounded-full mx-auto mb-4"></div>
-              Loading cards...
-            </div>
-          ) : trending.length === 0 ? (
-            <div className={`py-12 text-center ${theme.textSecondary}`}>
-              <div className="text-4xl mb-3 opacity-50">🔍</div>
-              <p>No cards found for this category</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {trending.map(card => (
-                  <div
-                    key={card.id}
-                    className="group cursor-pointer"
-                    onClick={() => onCardClick?.(card)}
-                  >
-                    <div className="relative">
-                      <img
-                        src={card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal}
-                        alt={card.name}
-                        className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-2 left-2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded font-mono">
-                        {getPrice(card)}
-                      </div>
-                    </div>
-                    <p className={`mt-2 text-sm truncate ${theme.textSecondary}`}>{card.name}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Load More Button */}
-              {nextPageUrl && (
-                <div className="flex justify-center mt-8">
-                  <button
-                    onClick={loadMoreTrending}
-                    disabled={trendingLoadingMore}
-                    className={`px-8 py-3 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''} disabled:opacity-50 flex items-center gap-2`}
-                  >
-                    {trendingLoadingMore ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Loading...
-                      </>
-                    ) : (
-                      <>Load More Cards</>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* End of results message */}
-              {!nextPageUrl && totalLoaded > 0 && (
-                <p className={`text-center mt-6 ${theme.textSecondary} text-sm`}>
-                  All {totalLoaded} cards loaded
-                </p>
-              )}
-            </>
           )}
         </div>
       )}
