@@ -141,15 +141,95 @@ function SyntaxHelp({ theme, onSearch }) {
             </div>
           </div>
 
-          {/* Examples Section */}
+          {/* Quick Categories */}
           <div className={`mt-4 pt-3 border-t ${theme.border}`}>
-            <span className="text-yellow-400 text-sm font-semibold">Try Examples: </span>
+            {/* EDH Staples */}
+            <div className="mb-3">
+              <span className="text-yellow-400 text-xs font-semibold uppercase">EDH Staples: </span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <button onClick={() => runExample('otag:ramp f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🌱 Ramp</button>
+                <button onClick={() => runExample('otag:removal f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>💀 Removal</button>
+                <button onClick={() => runExample('otag:draw f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🎴 Draw</button>
+                <button onClick={() => runExample('otag:board-wipe f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>💥 Wipes</button>
+                <button onClick={() => runExample('otag:tutor f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🔍 Tutors</button>
+                <button onClick={() => runExample('otag:counterspell f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🛡️ Counters</button>
+                <button onClick={() => runExample('otag:mana-rock f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>💎 Rocks</button>
+                <button onClick={() => runExample('otag:land-ramp f:commander')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🏔️ Land Ramp</button>
+              </div>
+            </div>
+
+            {/* Commanders by Color */}
+            <div className="mb-3">
+              <span className="text-yellow-400 text-xs font-semibold uppercase">👑 Commanders: </span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <button onClick={() => runExample('is:commander usd>0')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>All</button>
+                <button onClick={() => runExample('is:commander id:w')} className="px-2 py-1 text-xs rounded hover:opacity-80" style={{background: 'linear-gradient(135deg,#f8f6d8,#e8e4c8)', color: '#333'}}>⚪ White</button>
+                <button onClick={() => runExample('is:commander id:u')} className="px-2 py-1 text-xs rounded hover:opacity-80" style={{background: 'linear-gradient(135deg,#0e68ab,#1a8cd8)', color: '#fff'}}>🔵 Blue</button>
+                <button onClick={() => runExample('is:commander id:b')} className="px-2 py-1 text-xs rounded hover:opacity-80" style={{background: 'linear-gradient(135deg,#2b2b2b,#4a4a4a)', color: '#fff'}}>⚫ Black</button>
+                <button onClick={() => runExample('is:commander id:r')} className="px-2 py-1 text-xs rounded hover:opacity-80" style={{background: 'linear-gradient(135deg,#d32f2f,#f44336)', color: '#fff'}}>🔴 Red</button>
+                <button onClick={() => runExample('is:commander id:g')} className="px-2 py-1 text-xs rounded hover:opacity-80" style={{background: 'linear-gradient(135deg,#2e7d32,#4caf50)', color: '#fff'}}>🟢 Green</button>
+                <button onClick={() => runExample('is:commander id:c')} className="px-2 py-1 text-xs rounded hover:opacity-80" style={{background: 'linear-gradient(135deg,#9e9e9e,#bdbdbd)', color: '#333'}}>⬜ Colorless</button>
+              </div>
+            </div>
+
+            {/* Guild Commanders */}
+            <div className="mb-3">
+              <span className="text-yellow-400 text-xs font-semibold uppercase">Guilds: </span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <button onClick={() => runExample('is:commander id=ub')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Dimir</button>
+                <button onClick={() => runExample('is:commander id=bg')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Golgari</button>
+                <button onClick={() => runExample('is:commander id=rg')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Gruul</button>
+                <button onClick={() => runExample('is:commander id=uw')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Azorius</button>
+                <button onClick={() => runExample('is:commander id=br')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Rakdos</button>
+                <button onClick={() => runExample('is:commander id=wg')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Selesnya</button>
+                <button onClick={() => runExample('is:commander id=ur')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Izzet</button>
+                <button onClick={() => runExample('is:commander id=wb')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Orzhov</button>
+                <button onClick={() => runExample('is:commander id=gu')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Simic</button>
+                <button onClick={() => runExample('is:commander id=rw')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>Boros</button>
+              </div>
+            </div>
+
+            {/* Commander Features */}
+            <div className="mb-3">
+              <span className="text-yellow-400 text-xs font-semibold uppercase">Features: </span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <button onClick={() => runExample('is:commander is:partner')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🤝 Partners</button>
+                <button onClick={() => runExample('is:commander o:"background"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>📜 Backgrounds</button>
+                <button onClick={() => runExample('is:commander cmc<=3')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>⚡ Low Cost (≤3)</button>
+                <button onClick={() => runExample('is:commander usd<5')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>💰 Budget (&lt;$5)</button>
+                <button onClick={() => runExample('is:commander usd>20')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>💎 Premium (&gt;$20)</button>
+                <button onClick={() => runExample('is:commander pow>=5')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>💪 High Power (5+)</button>
+                <button onClick={() => runExample('is:commander o:"when ~ deals combat damage"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>⚔️ Combat Damage</button>
+                <button onClick={() => runExample('is:commander o:"whenever you cast"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🎯 Cast Triggers</button>
+              </div>
+            </div>
+
+            {/* Archetypes */}
+            <div className="mb-3">
+              <span className="text-yellow-400 text-xs font-semibold uppercase">Archetypes: </span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <button onClick={() => runExample('is:commander o:"token"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🪙 Tokens</button>
+                <button onClick={() => runExample('is:commander o:"+1/+1 counter"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>📈 +1/+1 Counters</button>
+                <button onClick={() => runExample('is:commander o:"graveyard"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>⚰️ Graveyard</button>
+                <button onClick={() => runExample('is:commander o:"sacrifice"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🩸 Sacrifice</button>
+                <button onClick={() => runExample('is:commander o:"artifact"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>⚙️ Artifacts</button>
+                <button onClick={() => runExample('is:commander o:"enchantment"')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>✨ Enchantments</button>
+                <button onClick={() => runExample('is:commander t:dragon')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🐉 Dragons</button>
+                <button onClick={() => runExample('is:commander t:elf')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🧝 Elves</button>
+                <button onClick={() => runExample('is:commander t:zombie')} className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20`}>🧟 Zombies</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Examples Section */}
+          <div className={`mt-3 pt-3 border-t ${theme.border}`}>
+            <span className="text-yellow-400 text-sm font-semibold">More Examples: </span>
             <div className="flex flex-wrap gap-2 mt-2">
               <button
-                onClick={() => runExample('t:creature c:g cmc<=3 f:commander')}
+                onClick={() => runExample('is:commander id<=bg cmc<=4')}
                 className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20 transition-colors`}
               >
-                Green creatures CMC 3 or less
+                Budget Golgari commanders
               </button>
               <button
                 onClick={() => runExample('otag:removal -t:creature usd<2')}
@@ -158,10 +238,10 @@ function SyntaxHelp({ theme, onSearch }) {
                 Budget non-creature removal
               </button>
               <button
-                onClick={() => runExample('t:legendary t:creature id:ub')}
+                onClick={() => runExample('is:commander is:partner')}
                 className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20 transition-colors`}
               >
-                Dimir commanders
+                Partner commanders
               </button>
               <button
                 onClick={() => runExample('otag:ramp c:g -t:creature')}
@@ -170,28 +250,28 @@ function SyntaxHelp({ theme, onSearch }) {
                 Green non-creature ramp
               </button>
               <button
-                onClick={() => runExample('t:creature pow>=7 cmc<=4')}
+                onClick={() => runExample('is:commander o:"draw" id<=u')}
                 className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20 transition-colors`}
               >
-                Big creatures, low cost
+                Blue draw commanders
               </button>
               <button
-                onClick={() => runExample('o:"draw a card" t:instant c:u')}
+                onClick={() => runExample('is:commander t:dragon')}
                 className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20 transition-colors`}
               >
-                Blue instants with draw
+                Dragon commanders
               </button>
               <button
-                onClick={() => runExample('is:reserved usd>50')}
+                onClick={() => runExample('is:commander pow>=6 cmc<=5')}
                 className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20 transition-colors`}
               >
-                Expensive Reserved List
+                Strong low-cost commanders
               </button>
               <button
-                onClick={() => runExample('otag:board-wipe c:w -c:multicolor')}
+                onClick={() => runExample('otag:board-wipe f:commander usd<3')}
                 className={`px-2 py-1 text-xs ${theme.bgSecondary} rounded hover:bg-purple-500/20 transition-colors`}
               >
-                Mono-white board wipes
+                Budget board wipes
               </button>
             </div>
           </div>
