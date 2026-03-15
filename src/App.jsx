@@ -576,7 +576,7 @@ function App() {
                     />
                   </svg>
                   <span className="hidden sm:inline">
-                    {syncing ? 'Syncing...' : hasUnsynced ? 'Sync' : 'Synced'}
+                    {syncing ? 'Syncing...' : hasUnsynced ? 'Sync Lists' : 'Lists Synced'}
                   </span>
                 </button>
                 <button
