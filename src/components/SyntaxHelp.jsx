@@ -64,20 +64,54 @@ function SyntaxHelp({ theme, onSearch }) {
               </div>
             </div>
 
-            {/* Oracle Tags */}
+            {/* Oracle Tags - Column 1 */}
             <div>
-              <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Oracle Tags (otag:)</h4>
+              <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Oracle Tags (otag:) - Basics</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
                 <div><code className="text-blue-400">otag:ramp</code> Produces extra mana</div>
+                <div><code className="text-blue-400">otag:mana-rock</code> Artifact mana sources</div>
+                <div><code className="text-blue-400">otag:land-ramp</code> Fetches lands</div>
+                <div><code className="text-blue-400">otag:mana-dork</code> Creatures that tap for mana</div>
+                <div><code className="text-blue-400">otag:draw</code> Draws cards</div>
+                <div><code className="text-blue-400">otag:card-advantage</code> Generates card advantage</div>
+                <div><code className="text-blue-400">otag:cantrip</code> Draws when cast</div>
                 <div><code className="text-blue-400">otag:removal</code> Destroys/exiles permanents</div>
-                <div><code className="text-blue-400">otag:draw</code> Draws extra cards</div>
+                <div><code className="text-blue-400">otag:spot-removal</code> Single target removal</div>
                 <div><code className="text-blue-400">otag:board-wipe</code> Destroys all creatures</div>
-                <div><code className="text-blue-400">otag:tutor</code> Searches library for cards</div>
+              </div>
+            </div>
+
+            {/* Oracle Tags - Column 2 */}
+            <div>
+              <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Oracle Tags - More</h4>
+              <div className={`${theme.textSecondary} text-xs space-y-1`}>
+                <div><code className="text-blue-400">otag:tutor</code> Searches library</div>
                 <div><code className="text-blue-400">otag:counterspell</code> Counters spells</div>
-                <div><code className="text-blue-400">otag:token-producer</code> Creates token creatures</div>
-                <div><code className="text-blue-400">otag:sacrifice-outlet</code> Lets you sacrifice</div>
-                <div><code className="text-blue-400">otag:life-gain</code> Gains life</div>
+                <div><code className="text-blue-400">otag:token-producer</code> Creates tokens</div>
+                <div><code className="text-blue-400">otag:sacrifice-outlet</code> Free sac outlet</div>
+                <div><code className="text-blue-400">otag:recursion</code> Returns from graveyard</div>
+                <div><code className="text-blue-400">otag:reanimator</code> Reanimates creatures</div>
                 <div><code className="text-blue-400">otag:graveyard-hate</code> Exiles graveyards</div>
+                <div><code className="text-blue-400">otag:life-gain</code> Gains life</div>
+                <div><code className="text-blue-400">otag:lifedrain</code> Drains opponents</div>
+                <div><code className="text-blue-400">otag:evasion</code> Has evasion abilities</div>
+              </div>
+            </div>
+
+            {/* Oracle Tags - Column 3 */}
+            <div>
+              <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Oracle Tags - Combat</h4>
+              <div className={`${theme.textSecondary} text-xs space-y-1`}>
+                <div><code className="text-blue-400">otag:haste-enabler</code> Gives haste</div>
+                <div><code className="text-blue-400">otag:pump</code> Buffs creatures</div>
+                <div><code className="text-blue-400">otag:lord</code> Tribal lord effects</div>
+                <div><code className="text-blue-400">otag:anthem</code> Team-wide buffs</div>
+                <div><code className="text-blue-400">otag:protection</code> Gives protection</div>
+                <div><code className="text-blue-400">otag:flicker</code> Exile and return</div>
+                <div><code className="text-blue-400">otag:copy</code> Copies creatures/spells</div>
+                <div><code className="text-blue-400">otag:theft</code> Steals permanents</div>
+                <div><code className="text-blue-400">otag:extra-turn</code> Extra turns</div>
+                <div><code className="text-blue-400">otag:extra-combat</code> Extra combats</div>
               </div>
             </div>
 

@@ -8,6 +8,8 @@ import {
 function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList }) {
   const [inWatchlist, setInWatchlist] = useState(false)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
+  const [currentFace, setCurrentFace] = useState(0)
+  const [isFlipping, setIsFlipping] = useState(false)
 
   useEffect(() => {
     if (user && card) {
@@ -15,6 +17,11 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
       setInWatchlist(isInWatchlistCached(card.id))
     }
   }, [user, card])
+
+  // Reset face when card changes
+  useEffect(() => {
+    setCurrentFace(0)
+  }, [card?.id])
 
   async function handleWatchlistToggle() {
     if (!user) {
@@ -47,8 +54,25 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
 
   if (!card) return null
 
+  // Check for double-faced card
+  const hasMultipleFaces = card.card_faces && card.card_faces.length > 1
+  const activeFace = hasMultipleFaces ? card.card_faces[currentFace] : null
+
+  function flipCard(e) {
+    e.stopPropagation()
+    if (!hasMultipleFaces) return
+    setIsFlipping(true)
+    setTimeout(() => {
+      setCurrentFace(prev => (prev + 1) % card.card_faces.length)
+      setIsFlipping(false)
+    }, 150)
+  }
+
   // Get the best image - handle both local DB format and Scryfall API format
-  const displayImage = card.image_large || card.image_normal ||
+  // For DFCs, use the active face
+  const displayImage = activeFace?.image_large || activeFace?.image_normal ||
+    activeFace?.image_uris?.large || activeFace?.image_uris?.normal ||
+    card.image_large || card.image_normal ||
     card.image_uris?.large || card.image_uris?.normal ||
     card.card_faces?.[0]?.image_large || card.card_faces?.[0]?.image_normal ||
     card.card_faces?.[0]?.image_uris?.large || card.card_faces?.[0]?.image_uris?.normal
@@ -83,19 +107,45 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
           onViewDetails()
         }}
       >
-        {displayImage ? (
-          <img
-            src={displayImage}
-            alt={card.name}
-            className="max-h-full max-w-full w-auto h-auto rounded-xl shadow-2xl cursor-pointer active:scale-95 transition-transform"
-            style={{ maxWidth: '95vw', maxHeight: '65vh' }}
-          />
-        ) : (
-          <div className="w-full max-w-sm aspect-[488/680] bg-gray-800 rounded-xl flex items-center justify-center">
-            <span className="text-gray-400 text-center p-4">{card.name}</span>
-          </div>
-        )}
+        <div className="relative">
+          {displayImage ? (
+            <img
+              src={displayImage}
+              alt={card.name}
+              className={`max-h-full max-w-full w-auto h-auto rounded-xl shadow-2xl cursor-pointer transition-all duration-150 ${
+                isFlipping ? 'scale-95 opacity-80' : 'active:scale-95'
+              }`}
+              style={{ maxWidth: '95vw', maxHeight: '60vh' }}
+            />
+          ) : (
+            <div className="w-full max-w-sm aspect-[488/680] bg-gray-800 rounded-xl flex items-center justify-center">
+              <span className="text-gray-400 text-center p-4">{card.name}</span>
+            </div>
+          )}
+
+          {/* Flip button for double-faced cards */}
+          {hasMultipleFaces && (
+            <button
+              onClick={flipCard}
+              className="absolute bottom-3 right-3 bg-black/80 hover:bg-black text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Flip
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Face indicator for DFCs */}
+      {hasMultipleFaces && (
+        <div className="text-center pb-1">
+          <span className="text-gray-400 text-sm">
+            {activeFace?.name || card.card_faces[currentFace]?.name} ({currentFace + 1}/{card.card_faces.length})
+          </span>
+        </div>
+      )}
 
       {/* Price badge */}
       {price && (
