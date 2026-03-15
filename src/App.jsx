@@ -8,6 +8,7 @@ import MyLists from './components/MyLists'
 import Settings from './components/Settings'
 import PriceOracle from './components/PriceOracle'
 import SyntaxHelp from './components/SyntaxHelp'
+import ThemeEffects from './components/ThemeEffects'
 import { hasCards, getDbInfo, db } from './lib/db'
 import { downloadCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
@@ -451,7 +452,10 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen ${theme.bg} ${theme.text}`}>
+    <div className={`min-h-screen ${theme.bg} ${theme.text} relative overflow-hidden`}>
+      {/* Theme particle effects */}
+      <ThemeEffects themeName={currentTheme} />
+
       {/* Sites Navigation Bar - scrollable on mobile */}
       <div className={`${theme.bgSecondary} border-b border-gray-700 px-2 sm:px-4 py-1.5 overflow-x-auto`}>
         <div className="flex items-center gap-3 sm:gap-4 min-w-max text-sm">

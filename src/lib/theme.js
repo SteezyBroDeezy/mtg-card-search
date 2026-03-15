@@ -240,6 +240,155 @@ export const themes = {
     accent: 'bg-gradient-to-r from-amber-700 via-stone-600 to-amber-600 hover:from-amber-600 hover:via-stone-500 hover:to-amber-500',
     ring: 'ring-amber-600',
     glow: 'shadow-amber-700/40'
+  },
+
+  // ===== SPECIAL ANIMATED THEMES =====
+
+  dragon: {
+    name: '🐉 Dragon Fire',
+    bg: 'bg-gradient-to-br from-red-950 via-orange-950 to-yellow-950 animate-gradient',
+    bgSecondary: 'bg-gradient-to-br from-red-900/90 to-orange-900/80',
+    bgTertiary: 'bg-red-800/80',
+    text: 'text-orange-100',
+    textSecondary: 'text-yellow-300',
+    border: 'border-orange-600/60',
+    borderAccent: 'border-orange-400',
+    accent: 'bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-500 hover:via-orange-400 hover:to-yellow-400',
+    ring: 'ring-orange-400',
+    glow: 'shadow-orange-500/60',
+    special: 'dragon'
+  },
+
+  planeswalker: {
+    name: '✨ Planeswalker',
+    bg: 'bg-gradient-to-br from-violet-950 via-purple-900 to-fuchsia-950 animate-gradient',
+    bgSecondary: 'bg-gradient-to-br from-violet-900/90 to-purple-900/80',
+    bgTertiary: 'bg-purple-800/80',
+    text: 'text-fuchsia-100',
+    textSecondary: 'text-violet-300',
+    border: 'border-purple-500/60',
+    borderAccent: 'border-fuchsia-400',
+    accent: 'bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 hover:from-violet-500 hover:via-purple-400 hover:to-fuchsia-400',
+    ring: 'ring-fuchsia-400',
+    glow: 'shadow-fuchsia-500/60',
+    special: 'sparks'
+  },
+
+  neon: {
+    name: '💜 Neon Cyberpunk',
+    bg: 'bg-gradient-to-br from-slate-950 via-purple-950 to-cyan-950',
+    bgSecondary: 'bg-black/80',
+    bgTertiary: 'bg-slate-900/90',
+    text: 'text-cyan-100',
+    textSecondary: 'text-purple-400',
+    border: 'border-cyan-500/60',
+    borderAccent: 'border-pink-400',
+    accent: 'bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 hover:from-cyan-400 hover:via-purple-400 hover:to-pink-400',
+    ring: 'ring-pink-400',
+    glow: 'shadow-pink-500/60',
+    special: 'neon'
+  },
+
+  cosmic: {
+    name: '🌌 Cosmic Void',
+    bg: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950',
+    bgSecondary: 'bg-black/70',
+    bgTertiary: 'bg-indigo-950/80',
+    text: 'text-indigo-100',
+    textSecondary: 'text-violet-300',
+    border: 'border-indigo-600/50',
+    borderAccent: 'border-violet-400',
+    accent: 'bg-gradient-to-r from-indigo-600 via-violet-500 to-purple-500 hover:from-indigo-500 hover:via-violet-400 hover:to-purple-400',
+    ring: 'ring-violet-400',
+    glow: 'shadow-violet-500/50',
+    special: 'stars'
+  },
+
+  goldMythic: {
+    name: '🏆 Mythic Gold',
+    bg: 'bg-gradient-to-br from-amber-950 via-yellow-900 to-orange-950 animate-gradient',
+    bgSecondary: 'bg-gradient-to-br from-amber-900/90 to-yellow-900/80',
+    bgTertiary: 'bg-yellow-800/80',
+    text: 'text-yellow-100',
+    textSecondary: 'text-amber-300',
+    border: 'border-yellow-500/60',
+    borderAccent: 'border-yellow-400',
+    accent: 'bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-400 hover:from-amber-400 hover:via-yellow-300 hover:to-orange-300',
+    ring: 'ring-yellow-400',
+    glow: 'shadow-yellow-500/60',
+    special: 'mythic'
+  },
+
+  iceStorm: {
+    name: '❄️ Ice Storm',
+    bg: 'bg-gradient-to-br from-cyan-950 via-blue-900 to-slate-950',
+    bgSecondary: 'bg-gradient-to-br from-cyan-900/90 to-blue-900/80',
+    bgTertiary: 'bg-blue-800/80',
+    text: 'text-cyan-100',
+    textSecondary: 'text-blue-300',
+    border: 'border-cyan-500/60',
+    borderAccent: 'border-cyan-400',
+    accent: 'bg-gradient-to-r from-cyan-600 via-blue-500 to-indigo-500 hover:from-cyan-500 hover:via-blue-400 hover:to-indigo-400',
+    ring: 'ring-cyan-400',
+    glow: 'shadow-cyan-500/60',
+    special: 'snow'
+  },
+
+  bloodMoon: {
+    name: '🌙 Blood Moon',
+    bg: 'bg-gradient-to-br from-red-950 via-rose-950 to-neutral-950',
+    bgSecondary: 'bg-gradient-to-br from-red-950/90 to-rose-950/80',
+    bgTertiary: 'bg-rose-900/80',
+    text: 'text-rose-100',
+    textSecondary: 'text-red-400',
+    border: 'border-red-700/60',
+    borderAccent: 'border-red-500',
+    accent: 'bg-gradient-to-r from-red-700 via-rose-600 to-pink-600 hover:from-red-600 hover:via-rose-500 hover:to-pink-500',
+    ring: 'ring-red-500',
+    glow: 'shadow-red-500/60',
+    special: 'blood'
+  },
+
+  zendikar: {
+    name: '🏔️ Zendikar',
+    bg: 'bg-gradient-to-br from-orange-950 via-amber-900 to-stone-950',
+    bgSecondary: 'bg-gradient-to-br from-orange-900/90 to-amber-900/80',
+    bgTertiary: 'bg-amber-800/80',
+    text: 'text-amber-100',
+    textSecondary: 'text-orange-300',
+    border: 'border-amber-600/60',
+    borderAccent: 'border-orange-400',
+    accent: 'bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-500 hover:from-orange-500 hover:via-amber-400 hover:to-yellow-400',
+    ring: 'ring-orange-400',
+    glow: 'shadow-orange-500/50'
+  },
+
+  innistrad: {
+    name: '🦇 Innistrad',
+    bg: 'bg-gradient-to-br from-slate-950 via-zinc-900 to-violet-950',
+    bgSecondary: 'bg-gradient-to-br from-slate-900/90 to-zinc-900/80',
+    bgTertiary: 'bg-zinc-800/80',
+    text: 'text-slate-100',
+    textSecondary: 'text-violet-300',
+    border: 'border-violet-700/60',
+    borderAccent: 'border-violet-500',
+    accent: 'bg-gradient-to-r from-violet-700 via-purple-600 to-fuchsia-600 hover:from-violet-600 hover:via-purple-500 hover:to-fuchsia-500',
+    ring: 'ring-violet-500',
+    glow: 'shadow-violet-500/50'
+  },
+
+  kamigawa: {
+    name: '🌸 Kamigawa',
+    bg: 'bg-gradient-to-br from-pink-950 via-rose-900 to-red-950',
+    bgSecondary: 'bg-gradient-to-br from-pink-900/90 to-rose-900/80',
+    bgTertiary: 'bg-rose-800/80',
+    text: 'text-pink-100',
+    textSecondary: 'text-rose-300',
+    border: 'border-pink-600/60',
+    borderAccent: 'border-pink-400',
+    accent: 'bg-gradient-to-r from-pink-600 via-rose-500 to-red-500 hover:from-pink-500 hover:via-rose-400 hover:to-red-400',
+    ring: 'ring-pink-400',
+    glow: 'shadow-pink-500/50'
   }
 }
 

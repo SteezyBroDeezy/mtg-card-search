@@ -13,7 +13,9 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
     'Basic': ['dark', 'light'],
     'Mana Colors': ['white', 'blue', 'black', 'red', 'green'],
     'Guilds': ['boros', 'dimir', 'simic', 'rakdos', 'golgari'],
-    'Special': ['mystical', 'artifact', 'multicolor', 'phyrexian', 'eldrazi', 'bone']
+    'Lore': ['mystical', 'artifact', 'multicolor', 'phyrexian', 'eldrazi', 'bone'],
+    'Planes': ['zendikar', 'innistrad', 'kamigawa'],
+    'Animated': ['dragon', 'planeswalker', 'neon', 'cosmic', 'goldMythic', 'iceStorm', 'bloodMoon']
   }
 
   return (
