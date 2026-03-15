@@ -26,13 +26,13 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Basic Filters</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">t:creature</code> Card type</div>
-                <div><code className="text-blue-400">t:legendary</code> Supertype</div>
-                <div><code className="text-blue-400">c:red</code> or <code className="text-blue-400">c:r</code> Color</div>
-                <div><code className="text-blue-400">c:ub</code> Blue AND black</div>
-                <div><code className="text-blue-400">r:mythic</code> Rarity</div>
-                <div><code className="text-blue-400">s:mkm</code> Set code</div>
-                <div><code className="text-blue-400">e:mkm</code> Set (expansion)</div>
+                <div><code className="text-blue-400">t:creature</code> Type is creature</div>
+                <div><code className="text-blue-400">t:legendary</code> Has legendary supertype</div>
+                <div><code className="text-blue-400">c:red</code> or <code className="text-blue-400">c:r</code> Contains red</div>
+                <div><code className="text-blue-400">c:ub</code> Contains blue AND black</div>
+                <div><code className="text-blue-400">r:mythic</code> Mythic rare cards</div>
+                <div><code className="text-blue-400">s:mkm</code> From set (3-letter code)</div>
+                <div><code className="text-blue-400">e:mkm</code> From expansion/set</div>
               </div>
             </div>
 
@@ -40,13 +40,13 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Text & Stats</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">o:draw</code> Oracle text</div>
-                <div><code className="text-blue-400">o:"enters the"</code> Exact phrase</div>
-                <div><code className="text-blue-400">cmc=3</code> Mana value equals</div>
-                <div><code className="text-blue-400">cmc&lt;=3</code> Mana value 3 or less</div>
-                <div><code className="text-blue-400">mv&gt;5</code> Mana value above 5</div>
-                <div><code className="text-blue-400">pow&gt;=4</code> Power 4+</div>
-                <div><code className="text-blue-400">tou&lt;=2</code> Toughness 2 or less</div>
+                <div><code className="text-blue-400">o:draw</code> Rules text contains "draw"</div>
+                <div><code className="text-blue-400">o:"enters the"</code> Exact phrase in text</div>
+                <div><code className="text-blue-400">cmc=3</code> Costs exactly 3 mana</div>
+                <div><code className="text-blue-400">cmc&lt;=3</code> Costs 3 or less mana</div>
+                <div><code className="text-blue-400">mv&gt;5</code> Costs more than 5 mana</div>
+                <div><code className="text-blue-400">pow&gt;=4</code> Power is 4 or greater</div>
+                <div><code className="text-blue-400">tou&lt;=2</code> Toughness is 2 or less</div>
               </div>
             </div>
 
@@ -54,13 +54,13 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Mana & Costs</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">m:GG</code> Mana cost has GG</div>
-                <div><code className="text-blue-400">m:2WW</code> Costs 2WW</div>
-                <div><code className="text-blue-400">m:{'{X}'}</code> Has X in cost</div>
-                <div><code className="text-blue-400">m:{'{W/U}'}</code> Hybrid mana</div>
-                <div><code className="text-blue-400">m:{'{2/W}'}</code> 2/white hybrid</div>
-                <div><code className="text-blue-400">m:{'{W/P}'}</code> Phyrexian mana</div>
-                <div><code className="text-blue-400">devotion:www</code> 3+ white pips</div>
+                <div><code className="text-blue-400">m:GG</code> Requires 2 green mana</div>
+                <div><code className="text-blue-400">m:2WW</code> Requires 2 colorless + 2 white</div>
+                <div><code className="text-blue-400">m:{'{X}'}</code> Has X in mana cost</div>
+                <div><code className="text-blue-400">m:{'{W/U}'}</code> Has white/blue hybrid</div>
+                <div><code className="text-blue-400">m:{'{2/W}'}</code> Has 2-or-white hybrid</div>
+                <div><code className="text-blue-400">m:{'{W/P}'}</code> Has Phyrexian white (pay 2 life)</div>
+                <div><code className="text-blue-400">devotion:www</code> 3+ white pips in cost</div>
               </div>
             </div>
 
@@ -68,16 +68,16 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Oracle Tags (otag:)</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">otag:ramp</code> Mana ramp</div>
-                <div><code className="text-blue-400">otag:removal</code> Removal spells</div>
-                <div><code className="text-blue-400">otag:draw</code> Card draw</div>
-                <div><code className="text-blue-400">otag:board-wipe</code> Board wipes</div>
-                <div><code className="text-blue-400">otag:tutor</code> Tutors</div>
-                <div><code className="text-blue-400">otag:counterspell</code> Counters</div>
-                <div><code className="text-blue-400">otag:token-producer</code> Token makers</div>
-                <div><code className="text-blue-400">otag:sacrifice-outlet</code> Sac outlets</div>
-                <div><code className="text-blue-400">otag:life-gain</code> Lifegain</div>
-                <div><code className="text-blue-400">otag:graveyard-hate</code> GY hate</div>
+                <div><code className="text-blue-400">otag:ramp</code> Produces extra mana</div>
+                <div><code className="text-blue-400">otag:removal</code> Destroys/exiles permanents</div>
+                <div><code className="text-blue-400">otag:draw</code> Draws extra cards</div>
+                <div><code className="text-blue-400">otag:board-wipe</code> Destroys all creatures</div>
+                <div><code className="text-blue-400">otag:tutor</code> Searches library for cards</div>
+                <div><code className="text-blue-400">otag:counterspell</code> Counters spells</div>
+                <div><code className="text-blue-400">otag:token-producer</code> Creates token creatures</div>
+                <div><code className="text-blue-400">otag:sacrifice-outlet</code> Lets you sacrifice</div>
+                <div><code className="text-blue-400">otag:life-gain</code> Gains life</div>
+                <div><code className="text-blue-400">otag:graveyard-hate</code> Exiles graveyards</div>
               </div>
             </div>
 
@@ -85,14 +85,14 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-red-400 font-semibold mb-2 text-sm">Exclusions (- prefix)</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-red-400">-t:creature</code> NOT creatures</div>
-                <div><code className="text-red-400">-t:legendary</code> Non-legendary</div>
-                <div><code className="text-red-400">-c:green</code> Exclude green</div>
-                <div><code className="text-red-400">-c:g</code> Exclude green (short)</div>
-                <div><code className="text-red-400">-r:common</code> No commons</div>
-                <div><code className="text-red-400">-r:uncommon</code> No uncommons</div>
-                <div><code className="text-red-400">-o:flying</code> No flying text</div>
-                <div><code className="text-red-400">-s:mkm</code> Not from MKM</div>
+                <div><code className="text-red-400">-t:creature</code> Exclude all creatures</div>
+                <div><code className="text-red-400">-t:legendary</code> Exclude legendary cards</div>
+                <div><code className="text-red-400">-c:green</code> Exclude cards with green</div>
+                <div><code className="text-red-400">-c:g</code> Same as above (shorthand)</div>
+                <div><code className="text-red-400">-r:common</code> Exclude common rarity</div>
+                <div><code className="text-red-400">-r:uncommon</code> Exclude uncommons</div>
+                <div><code className="text-red-400">-o:flying</code> No "flying" in rules text</div>
+                <div><code className="text-red-400">-s:mkm</code> Exclude Karlov Manor set</div>
               </div>
             </div>
 
@@ -100,13 +100,13 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Color Identity (EDH)</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">id:bg</code> Golgari identity</div>
-                <div><code className="text-blue-400">id:wubrg</code> 5-color identity</div>
-                <div><code className="text-blue-400">id&lt;=ub</code> Fits in Dimir</div>
-                <div><code className="text-blue-400">id:c</code> Colorless identity</div>
-                <div><code className="text-blue-400">id=rg</code> Exactly Gruul</div>
-                <div><code className="text-blue-400">is:commander</code> Can be commander</div>
-                <div><code className="text-blue-400">is:partner</code> Has partner</div>
+                <div><code className="text-blue-400">id:bg</code> Black+green (Golgari) identity</div>
+                <div><code className="text-blue-400">id:wubrg</code> All 5 colors identity</div>
+                <div><code className="text-blue-400">id&lt;=ub</code> Playable in blue+black deck</div>
+                <div><code className="text-blue-400">id:c</code> Colorless only (no colors)</div>
+                <div><code className="text-blue-400">id=rg</code> Exactly red+green only</div>
+                <div><code className="text-blue-400">is:commander</code> Legal as commander</div>
+                <div><code className="text-blue-400">is:partner</code> Has partner keyword</div>
               </div>
             </div>
 
@@ -114,14 +114,14 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Price & Format</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">usd&lt;5</code> Under $5</div>
-                <div><code className="text-blue-400">usd&gt;10</code> Over $10</div>
-                <div><code className="text-blue-400">usd&lt;=1</code> $1 or less</div>
-                <div><code className="text-blue-400">f:commander</code> Commander legal</div>
-                <div><code className="text-blue-400">f:modern</code> Modern legal</div>
-                <div><code className="text-blue-400">f:standard</code> Standard legal</div>
-                <div><code className="text-blue-400">f:pioneer</code> Pioneer legal</div>
-                <div><code className="text-blue-400">f:pauper</code> Pauper legal</div>
+                <div><code className="text-blue-400">usd&lt;5</code> Price under $5</div>
+                <div><code className="text-blue-400">usd&gt;10</code> Price over $10</div>
+                <div><code className="text-blue-400">usd&lt;=1</code> Budget cards ($1 or less)</div>
+                <div><code className="text-blue-400">f:commander</code> Legal in Commander/EDH</div>
+                <div><code className="text-blue-400">f:modern</code> Legal in Modern format</div>
+                <div><code className="text-blue-400">f:standard</code> Legal in Standard</div>
+                <div><code className="text-blue-400">f:pioneer</code> Legal in Pioneer</div>
+                <div><code className="text-blue-400">f:pauper</code> Legal in Pauper (commons)</div>
               </div>
             </div>
 
@@ -129,14 +129,14 @@ function SyntaxHelp({ theme, onSearch }) {
             <div>
               <h4 className="text-yellow-400 font-semibold mb-2 text-sm">Special Filters</h4>
               <div className={`${theme.textSecondary} text-xs space-y-1`}>
-                <div><code className="text-blue-400">is:reserved</code> Reserved list</div>
-                <div><code className="text-blue-400">is:reprint</code> Reprints only</div>
-                <div><code className="text-blue-400">is:firstprint</code> First printings</div>
-                <div><code className="text-blue-400">is:full</code> Full art</div>
-                <div><code className="text-blue-400">is:extended</code> Extended art</div>
-                <div><code className="text-blue-400">is:foil</code> Foil available</div>
-                <div><code className="text-blue-400">is:modal</code> Modal DFC</div>
-                <div><code className="text-blue-400">is:split</code> Split cards</div>
+                <div><code className="text-blue-400">is:reserved</code> On Reserved List (no reprints)</div>
+                <div><code className="text-blue-400">is:reprint</code> Reprinted versions only</div>
+                <div><code className="text-blue-400">is:firstprint</code> Original printing only</div>
+                <div><code className="text-blue-400">is:full</code> Full art cards</div>
+                <div><code className="text-blue-400">is:extended</code> Extended art treatment</div>
+                <div><code className="text-blue-400">is:foil</code> Available in foil</div>
+                <div><code className="text-blue-400">is:modal</code> Choose-a-side double-faced</div>
+                <div><code className="text-blue-400">is:split</code> Split cards (Fire // Ice)</div>
               </div>
             </div>
           </div>
