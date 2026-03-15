@@ -62,6 +62,7 @@ function App() {
   })
   const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
+  const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
 
   // PWA Update handling
   const {
@@ -456,6 +457,7 @@ function App() {
   function handleSetClick(set) {
     // Search for all cards in this set
     setShowSetsBrowser(false)
+    setCurrentBrowsingSet(set) // Remember which set we're browsing
     handleSearch(`s:${set.code}`)
   }
 
@@ -655,7 +657,7 @@ function App() {
         {!showPriceOracle && dbStatus === 'ready' && (
           <>
             <div className="mb-6">
-              <SearchBar onSearch={handleSearch} theme={theme} />
+              <SearchBar onSearch={(q) => { setCurrentBrowsingSet(null); handleSearch(q); }} theme={theme} />
               <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <p className={`${theme.textSecondary} text-sm`}>
@@ -700,6 +702,37 @@ function App() {
 
             {/* Collapsible Syntax Help */}
             <SyntaxHelp theme={theme} onSearch={handleSearch} />
+
+            {/* Set Header Banner - shows when browsing a specific set */}
+            {currentBrowsingSet && allResults.length > 0 && (
+              <div className={`${theme.bgSecondary} rounded-lg p-4 mb-4 flex items-center gap-4 border ${theme.border}`}>
+                {currentBrowsingSet.icon_svg_uri && (
+                  <img
+                    src={currentBrowsingSet.icon_svg_uri}
+                    alt={currentBrowsingSet.name}
+                    className="w-12 h-12 object-contain"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                  />
+                )}
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold">{currentBrowsingSet.name}</h3>
+                  <p className={`text-sm ${theme.textSecondary}`}>
+                    {currentBrowsingSet.code.toUpperCase()} • {currentBrowsingSet.card_count} cards • Released {currentBrowsingSet.released_at || 'TBA'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setCurrentBrowsingSet(null)
+                    setSearchResults([])
+                    setAllResults([])
+                    setLastQuery('')
+                  }}
+                  className={`px-3 py-1.5 ${theme.bgTertiary} rounded-lg text-sm hover:opacity-80`}
+                >
+                  ✕ Clear
+                </button>
+              </div>
+            )}
 
             {/* Results count */}
             {allResults.length > 0 && (
