@@ -63,6 +63,7 @@ function App() {
   const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
+  const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
 
   // PWA Update handling
   const {
@@ -233,6 +234,24 @@ function App() {
     if (card.prices?.usd_foil) return parseFloat(card.prices.usd_foil)
     if (card.prices?.eur) return parseFloat(card.prices.eur)
     return Infinity // No price = sort last
+  }
+
+  // Helper to check if card is a DFC and get image for current face
+  function isDoubleFaced(card) {
+    return card.card_faces && card.card_faces.length > 1 && card.card_faces[0]?.image_uris
+  }
+
+  function getCardImage(card, isFlipped) {
+    if (isDoubleFaced(card)) {
+      const faceIndex = isFlipped ? 1 : 0
+      return card.card_faces[faceIndex]?.image_uris?.normal || card.card_faces[faceIndex]?.image_uris?.small
+    }
+    return card.image_normal || card.image_small || card.image_uris?.normal || card.image_uris?.small
+  }
+
+  function toggleCardFlip(cardId, e) {
+    e.stopPropagation()
+    setFlippedCards(prev => ({ ...prev, [cardId]: !prev[cardId] }))
   }
 
   // Group cards by name and pick the best representative
@@ -752,44 +771,61 @@ function App() {
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {searchResults.map(card => (
-                <div
-                  key={card.id}
-                  role="button"
-                  tabIndex={0}
-                  className="group cursor-pointer relative active:scale-95 transition-transform"
-                  onClick={() => handleCardClick(card)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCardClick(card)}
-                >
-                  {(card.image_normal || card.image_small) ? (
-                    <img
-                      src={card.image_normal || card.image_small}
-                      alt={card.name}
-                      className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
-                      loading="lazy"
-                      draggable={false}
-                    />
-                  ) : (
-                    <div className={`w-full aspect-[488/680] ${theme.bgSecondary} rounded-lg flex items-center justify-center`}>
-                      <span className={`${theme.textSecondary} text-sm text-center p-2`}>{card.name}</span>
-                    </div>
-                  )}
+              {searchResults.map(card => {
+                const isDFC = isDoubleFaced(card)
+                const isFlipped = flippedCards[card.id] || false
+                const cardImage = getCardImage(card, isFlipped)
 
-                  {/* Price badge with versions count */}
-                  <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                    {card.prices?.usd && (
-                      <div className="bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
-                        ${card.prices.usd}
+                return (
+                  <div
+                    key={card.id}
+                    role="button"
+                    tabIndex={0}
+                    className="group cursor-pointer relative active:scale-95 transition-transform"
+                    onClick={() => handleCardClick(card)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCardClick(card)}
+                  >
+                    {cardImage ? (
+                      <img
+                        src={cardImage}
+                        alt={card.name}
+                        className={`w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform ${isFlipped ? 'scale-x-100' : ''}`}
+                        loading="lazy"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className={`w-full aspect-[488/680] ${theme.bgSecondary} rounded-lg flex items-center justify-center`}>
+                        <span className={`${theme.textSecondary} text-sm text-center p-2`}>{card.name}</span>
                       </div>
                     )}
+
+                    {/* Flip button for DFCs */}
+                    {isDFC && (
+                      <button
+                        onClick={(e) => toggleCardFlip(card.id, e)}
+                        className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Flip card"
+                      >
+                        🔄
+                      </button>
+                    )}
+
+                    {/* Versions count - bottom left */}
                     {card._printingCount > 1 && (
-                      <div className="bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
+                      <div className="absolute bottom-2 left-2 bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
                         {card._printingCount}v
                       </div>
                     )}
+
+                    {/* Price badge - bottom center */}
+                    {card.prices?.usd && (
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
+                        ${card.prices.usd}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Load More button */}
