@@ -534,10 +534,23 @@ function checkFilterCondition(card, filter) {
   }
 }
 
+// Normalize text for fuzzy matching (remove accents, apostrophes, etc.)
+function normalizeText(text) {
+  return text
+    .normalize('NFD') // Decompose accented characters
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
+    .replace(/[''`]/g, '') // Remove apostrophes
+    .replace(/[æ]/gi, 'ae')
+    .replace(/[œ]/gi, 'oe')
+    .toLowerCase()
+}
+
 export function matchesFilters(card, filters, nameSearch) {
-  // Check name
+  // Check name with normalized matching (ignores accents/apostrophes)
   if (nameSearch) {
-    if (!card.name.toLowerCase().includes(nameSearch.toLowerCase())) {
+    const normalizedCardName = normalizeText(card.name)
+    const normalizedSearch = normalizeText(nameSearch)
+    if (!normalizedCardName.includes(normalizedSearch)) {
       return false
     }
   }

@@ -182,24 +182,33 @@ export async function syncLists(userId) {
     }
 
     // 6. Sync unsynced cards for existing lists
-    const unsyncedCards = await db.listCards.where('synced').equals(false).toArray()
+    // Use filter instead of where to handle undefined synced values
+    const allCards = await db.listCards.toArray()
+    const unsyncedCards = allCards.filter(c => c.synced !== true)
     for (const card of unsyncedCards) {
-      if (!card.listId.startsWith('local_')) {
-        const cardRef = doc(firestore, 'users', userId, 'lists', card.listId, 'cards', card.cardId)
-        await setDoc(cardRef, {
-          cardId: card.cardId,
-          name: card.name,
-          image_small: card.image_small,
-          image_normal: card.image_normal,
-          note: card.note || '',
-          addedAt: card.addedAt
-        })
-        await db.listCards.update([card.listId, card.cardId], { synced: true })
+      if (card.listId && card.cardId && !card.listId.startsWith('local_')) {
+        try {
+          const cardRef = doc(firestore, 'users', userId, 'lists', card.listId, 'cards', card.cardId)
+          await setDoc(cardRef, {
+            cardId: card.cardId,
+            name: card.name,
+            image_small: card.image_small || '',
+            image_normal: card.image_normal || '',
+            note: card.note || '',
+            addedAt: card.addedAt || new Date().toISOString()
+          })
+          await db.listCards.put({ ...card, synced: true })
+        } catch (cardErr) {
+          console.error('Error syncing card:', card.cardId, cardErr)
+        }
       }
     }
 
     // 7. Mark all local lists as synced
-    await db.lists.toCollection().modify({ synced: true })
+    const allLists = await db.lists.toArray()
+    for (const list of allLists) {
+      await db.lists.put({ ...list, synced: true })
+    }
 
     // 8. Save last sync time
     await db.meta.put({ key: 'lastListSync', value: new Date().toISOString() })
@@ -219,7 +228,17 @@ export async function getLastSyncTime() {
 
 // Check if there are unsynced changes
 export async function hasUnsyncedChanges() {
-  const unsyncedLists = await db.lists.where('synced').equals(false).count()
-  const unsyncedCards = await db.listCards.where('synced').equals(false).count()
-  return unsyncedLists > 0 || unsyncedCards > 0
+  try {
+    // Use filter to handle undefined synced values
+    const allLists = await db.lists.toArray()
+    const unsyncedLists = allLists.filter(l => l.synced !== true).length
+
+    const allCards = await db.listCards.toArray()
+    const unsyncedCards = allCards.filter(c => c.synced !== true).length
+
+    return unsyncedLists > 0 || unsyncedCards > 0
+  } catch (err) {
+    console.error('Error checking unsynced changes:', err)
+    return false
+  }
 }

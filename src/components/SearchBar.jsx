@@ -50,6 +50,17 @@ function SearchBar({ onSearch, theme }) {
   const [oracleValue, setOracleValue] = useState('')
   const [setCode, setSetCode] = useState('')
 
+  // Normalize text for fuzzy matching (remove accents, apostrophes, etc.)
+  function normalizeText(text) {
+    return text
+      .normalize('NFD') // Decompose accented characters
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
+      .replace(/[''`]/g, '') // Remove apostrophes
+      .replace(/[æ]/gi, 'ae')
+      .replace(/[œ]/gi, 'oe')
+      .toLowerCase()
+  }
+
   // Fetch card name suggestions
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -62,6 +73,8 @@ function SearchBar({ onSearch, theme }) {
       }
 
       try {
+        const normalizedQuery = normalizeText(trimmed)
+
         // First try startsWithIgnoreCase (faster, indexed)
         let results = await db.cards
           .where('name')
@@ -69,11 +82,10 @@ function SearchBar({ onSearch, theme }) {
           .limit(20)
           .toArray()
 
-        // If no results, fall back to contains search
+        // If no results, fall back to normalized fuzzy search
         if (results.length === 0) {
-          const lowerTrimmed = trimmed.toLowerCase()
           results = await db.cards
-            .filter(card => card.name.toLowerCase().includes(lowerTrimmed))
+            .filter(card => normalizeText(card.name).includes(normalizedQuery))
             .limit(20)
             .toArray()
         }
