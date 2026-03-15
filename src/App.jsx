@@ -9,6 +9,7 @@ import Settings from './components/Settings'
 import PriceOracle from './components/PriceOracle'
 import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
+import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db } from './lib/db'
 import { downloadCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
@@ -60,6 +61,7 @@ function App() {
     return saved === 'true'
   })
   const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
+  const [showSetsBrowser, setShowSetsBrowser] = useState(false)
 
   // PWA Update handling
   const {
@@ -451,6 +453,12 @@ function App() {
     await logOut()
   }
 
+  function handleSetClick(set) {
+    // Search for all cards in this set
+    setShowSetsBrowser(false)
+    handleSearch(`s:${set.code}`)
+  }
+
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} relative overflow-hidden`}>
       {/* Theme particle effects */}
@@ -649,9 +657,18 @@ function App() {
             <div className="mb-6">
               <SearchBar onSearch={handleSearch} theme={theme} />
               <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
-                <p className={`${theme.textSecondary} text-sm`}>
-                  {cardCount.toLocaleString()} cards in database
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className={`${theme.textSecondary} text-sm`}>
+                    {cardCount.toLocaleString()} cards in database
+                  </p>
+                  <button
+                    onClick={() => setShowSetsBrowser(true)}
+                    className={`px-3 py-1.5 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium hover:border-purple-500 transition-colors flex items-center gap-2`}
+                  >
+                    <span>📦</span>
+                    Browse Sets
+                  </button>
+                </div>
                 <div className="flex items-center gap-4">
                   <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
                     <input
@@ -951,6 +968,15 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sets Browser */}
+      {showSetsBrowser && (
+        <SetsBrowser
+          theme={theme}
+          onClose={() => setShowSetsBrowser(false)}
+          onSetClick={handleSetClick}
+        />
       )}
 
     </div>
