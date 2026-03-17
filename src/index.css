@@ -1,19 +1,25 @@
  @import "tailwindcss";
 
-/* ===== MTG CARD SEARCH CUSTOM STYLES ===== */
+/* Hide scrollbar but keep scroll functionality (for filter tabs) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 
+/* ===== MTG CARD SEARCH CUSTOM STYLES ===== */
 /* Animated gradient background */
 @keyframes gradientShift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradientShift 15s ease infinite;
 }
-
 /* Floating particles effect */
 @keyframes float {
   0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0; }
@@ -21,41 +27,34 @@
   90% { opacity: 1; }
   100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
 }
-
 .particle {
   position: fixed;
   pointer-events: none;
   animation: float linear infinite;
   z-index: 0;
 }
-
 /* Glowing border effect */
 @keyframes glowPulse {
   0%, 100% { box-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor; }
   50% { box-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor; }
 }
-
 .glow-border {
   animation: glowPulse 2s ease-in-out infinite;
 }
-
 /* Card hover effects */
 .card-hover-3d {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   transform-style: preserve-3d;
 }
-
 .card-hover-3d:hover {
   transform: scale(1.05) rotateY(5deg) rotateX(5deg);
   box-shadow: -10px 10px 30px rgba(0,0,0,0.4);
 }
-
 /* Mythic shimmer effect */
 @keyframes mythicShimmer {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
-
 .mythic-shimmer {
   background: linear-gradient(90deg,
     transparent 0%,
@@ -67,7 +66,6 @@
   background-size: 200% 100%;
   animation: mythicShimmer 3s linear infinite;
 }
-
 /* Mana symbol decorations */
 .mana-decoration {
   position: fixed;
@@ -76,13 +74,11 @@
   pointer-events: none;
   z-index: 0;
 }
-
 /* Sparks effect for Planeswalker theme */
 @keyframes sparkle {
   0%, 100% { opacity: 0; transform: scale(0); }
   50% { opacity: 1; transform: scale(1); }
 }
-
 .sparkle {
   position: absolute;
   width: 4px;
@@ -91,7 +87,6 @@
   border-radius: 50%;
   animation: sparkle 1.5s ease-in-out infinite;
 }
-
 /* Fire effect for Dragon theme */
 @keyframes fireGlow {
   0%, 100% {
@@ -103,11 +98,9 @@
     filter: brightness(1.2);
   }
 }
-
 .fire-glow {
   animation: fireGlow 2s ease-in-out infinite;
 }
-
 /* Neon flicker effect */
 @keyframes neonFlicker {
   0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
@@ -121,17 +114,14 @@
     text-shadow: none;
   }
 }
-
 .neon-text {
   animation: neonFlicker 4s linear infinite;
 }
-
 /* Cosmic stars background */
 @keyframes twinkle {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
-
 .star {
   position: fixed;
   width: 2px;
@@ -141,12 +131,10 @@
   pointer-events: none;
   animation: twinkle 2s ease-in-out infinite;
 }
-
 /* Header glow effect */
 .header-glow {
   position: relative;
 }
-
 .header-glow::after {
   content: '';
   position: absolute;
@@ -157,23 +145,19 @@
   background: linear-gradient(90deg, transparent, currentColor, transparent);
   opacity: 0.5;
 }
-
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: rgba(0,0,0,0.2);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.2);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255,255,255,0.3);
 }
