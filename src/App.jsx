@@ -1,15 +1,28 @@
 import { useState, useEffect } from 'react'
 import SearchBar from './components/SearchBar'
 import CardDetail from './components/CardDetail'
+import QuickCardView from './components/QuickCardView'
+import SaveToListModal from './components/SaveToListModal'
 import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
 import Settings from './components/Settings'
 import PriceOracle from './components/PriceOracle'
+import SyntaxHelp from './components/SyntaxHelp'
+import ThemeEffects from './components/ThemeEffects'
+import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db } from './lib/db'
 import { downloadCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
+import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
+import {
+  initPriceOracleCache,
+  clearPriceOracleCache,
+  fullSync as syncPriceOracle,
+  hasPendingChanges as hasPriceOraclePending
+} from './lib/priceOracleCache'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 
 function App() {
   const [dbStatus, setDbStatus] = useState('checking')
@@ -38,6 +51,32 @@ function App() {
     const saved = localStorage.getItem('mtg-group-by-name')
     return saved !== null ? saved === 'true' : true // default to true
   })
+  const [syncing, setSyncing] = useState(false)
+  const [hasUnsynced, setHasUnsynced] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState(null)
+  const [quickViewCard, setQuickViewCard] = useState(null)
+  const [showQuickSaveModal, setShowQuickSaveModal] = useState(false)
+  const [useScryfall, setUseScryfall] = useState(() => {
+    const saved = localStorage.getItem('mtg-use-scryfall')
+    return saved === 'true'
+  })
+  const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
+  const [showSetsBrowser, setShowSetsBrowser] = useState(false)
+  const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
+  const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
+
+  // PWA Update handling
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      console.log('SW Registered:', r)
+    },
+    onRegisterError(error) {
+      console.log('SW registration error:', error)
+    },
+  })
 
   const theme = themes[currentTheme]
 
@@ -55,11 +94,68 @@ function App() {
   useEffect(() => {
     checkDatabase()
     requestPersistentStorage()
-    const unsubscribe = onAuthChange((user) => {
+    const unsubscribe = onAuthChange(async (user) => {
       setUser(user)
+      if (user) {
+        // Initialize price oracle cache ONCE on login (saves tons of Firebase reads)
+        await initPriceOracleCache(user.uid)
+        checkSyncStatus()
+      } else {
+        // Clear cache on logout
+        clearPriceOracleCache()
+      }
     })
     return () => unsubscribe()
   }, [])
+
+  async function checkSyncStatus() {
+    const listUnsynced = await hasUnsyncedChanges()
+    const priceOracleUnsynced = hasPriceOraclePending()
+    setHasUnsynced(listUnsynced || priceOracleUnsynced)
+    const syncTime = await getLastSyncTime()
+    setLastSyncTime(syncTime)
+  }
+
+  async function handleListSync() {
+    if (!user) return
+    setSyncing(true)
+    try {
+      // Sync both lists AND price oracle data
+      const [listResult, priceResult] = await Promise.all([
+        syncLists(user.uid),
+        syncPriceOracle(user.uid)
+      ])
+
+      if (listResult.success && priceResult.success) {
+        await checkSyncStatus()
+      } else {
+        const errors = []
+        if (!listResult.success) errors.push('Lists: ' + listResult.error)
+        if (!priceResult.success) errors.push('Price Oracle: ' + priceResult.error)
+        alert('Sync issues: ' + errors.join(', '))
+      }
+    } catch (err) {
+      console.error('Sync failed:', err)
+      alert('Sync failed: ' + err.message)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  function formatSyncTime(isoString) {
+    if (!isoString) return 'Never'
+    const date = new Date(isoString)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    return `${diffDays}d ago`
+  }
 
   useEffect(() => {
     localStorage.setItem('mtg-group-by-name', groupByName.toString())
@@ -147,6 +243,24 @@ function App() {
     return Infinity // No price = sort last
   }
 
+  // Helper to check if card is a DFC and get image for current face
+  function isDoubleFaced(card) {
+    return card.card_faces && card.card_faces.length > 1 && card.card_faces[0]?.image_uris
+  }
+
+  function getCardImage(card, isFlipped) {
+    if (isDoubleFaced(card)) {
+      const faceIndex = isFlipped ? 1 : 0
+      return card.card_faces[faceIndex]?.image_uris?.normal || card.card_faces[faceIndex]?.image_uris?.small
+    }
+    return card.image_normal || card.image_small || card.image_uris?.normal || card.image_uris?.small
+  }
+
+  function toggleCardFlip(cardId, e) {
+    e.stopPropagation()
+    setFlippedCards(prev => ({ ...prev, [cardId]: !prev[cardId] }))
+  }
+
   // Group cards by name and pick the best representative
   function groupCardsByName(cards) {
     const groups = new Map()
@@ -180,9 +294,39 @@ function App() {
     return grouped
   }
 
+  // Search Scryfall API directly (for otag: and other API-only features)
+  async function searchScryfall(query) {
+    const SCRYFALL_API = 'https://api.scryfall.com'
+    try {
+      const response = await fetch(
+        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards`
+      )
+      const data = await response.json()
+      if (data.object === 'error') {
+        console.error('Scryfall error:', data.details)
+        return []
+      }
+      if (data.data) {
+        // Transform Scryfall results to match our local card format
+        return data.data.map(card => ({
+          ...card,
+          image_small: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small,
+          image_normal: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal,
+          image_large: card.image_uris?.large || card.card_faces?.[0]?.image_uris?.large,
+          image_art_crop: card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop
+        }))
+      }
+      return []
+    } catch (err) {
+      console.error('Scryfall API error:', err)
+      return []
+    }
+  }
+
   async function handleSearch(query) {
     setLastQuery(query)
     setSearchError(null)
+    setSearchSource(null)
 
     // Persist the query so PWA restores it on reopen
     if (query.trim()) {
@@ -198,20 +342,30 @@ function App() {
       return
     }
 
-    const { filters, nameSearch } = parseSearch(query)
+    const { filters, nameSearch, requiresScryfall } = parseSearch(query)
+
+    // Determine if we should use Scryfall API
+    const shouldUseScryfall = useScryfall || requiresScryfall
 
     let results
     try {
-      if (filters.length === 0 && nameSearch) {
-        results = await db.cards
-          .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
-          .limit(500)
-          .toArray()
+      // Use Scryfall API if toggle is on or query requires it
+      if (shouldUseScryfall) {
+        setSearchSource('scryfall')
+        results = await searchScryfall(query)
       } else {
-        results = await db.cards
-          .filter(card => matchesFilters(card, filters, nameSearch))
-          .limit(500)
-          .toArray()
+        setSearchSource('local')
+        if (filters.length === 0 && nameSearch) {
+          results = await db.cards
+            .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
+            .limit(500)
+            .toArray()
+        } else {
+          results = await db.cards
+            .filter(card => matchesFilters(card, filters, nameSearch))
+            .limit(500)
+            .toArray()
+        }
       }
     } catch (err) {
       console.error('Search error:', err)
@@ -303,7 +457,15 @@ function App() {
     setDisplayCount(newCount)
   }
 
-  async function handleCardClick(card) {
+  function handleCardClick(card) {
+    // Go directly to full card detail view (skip quick view)
+    handleViewFullDetails(card)
+  }
+
+  async function handleViewFullDetails(card) {
+    // Close quick view and open full details
+    setQuickViewCard(null)
+
     // If grouped, we already have all printings
     if (card._allPrintings) {
       setAllPrintings(card._allPrintings)
@@ -325,8 +487,18 @@ function App() {
     await logOut()
   }
 
+  function handleSetClick(set) {
+    // Search for all cards in this set
+    setShowSetsBrowser(false)
+    setCurrentBrowsingSet(set) // Remember which set we're browsing
+    handleSearch(`s:${set.code}`)
+  }
+
   return (
-    <div className={`min-h-screen ${theme.bg} ${theme.text}`}>
+    <div className={`min-h-screen ${theme.bg} ${theme.text} relative overflow-hidden`}>
+      {/* Theme particle effects */}
+      <ThemeEffects themeName={currentTheme} />
+
       {/* Sites Navigation Bar - scrollable on mobile */}
       <div className={`${theme.bgSecondary} border-b border-gray-700 px-2 sm:px-4 py-1.5 overflow-x-auto`}>
         <div className="flex items-center gap-3 sm:gap-4 min-w-max text-sm">
@@ -391,6 +563,36 @@ function App() {
 
             {user ? (
               <>
+                {/* Sync Button - Prominent when there are unsynced changes */}
+                <button
+                  onClick={handleListSync}
+                  disabled={syncing}
+                  className={`flex items-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    syncing
+                      ? 'bg-gray-600 text-gray-400 cursor-wait'
+                      : hasUnsynced
+                      ? 'bg-yellow-600 hover:bg-yellow-500 text-white animate-pulse'
+                      : 'bg-green-700/50 hover:bg-green-600 text-green-300'
+                  }`}
+                  title={hasUnsynced ? 'Sync pending changes' : `Last synced: ${formatSyncTime(lastSyncTime)}`}
+                >
+                  <svg
+                    className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {syncing ? 'Syncing...' : hasUnsynced ? 'Sync Lists' : 'Lists Synced'}
+                  </span>
+                </button>
                 <button
                   onClick={() => setShowLists(true)}
                   className={`p-2 sm:px-3 sm:py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
@@ -489,71 +691,161 @@ function App() {
           <>
             <div className="mb-6">
               <SearchBar
-                onSearch={handleSearch}
+                onSearch={(q) => { setCurrentBrowsingSet(null); handleSearch(q); }}
                 theme={theme}
                 searchHistory={searchHistory}
                 onHistorySelect={rerunSearch}
                 initialQuery={lastQuery}
               />
-              <div className="flex items-center justify-between mt-2">
-                <p className={`${theme.textSecondary} text-sm`}>
-                  {cardCount.toLocaleString()} cards in database
-                </p>
-                <label className={`flex items-center gap-2 text-sm ${theme.textSecondary}`}>
-                  <input
-                    type="checkbox"
-                    checked={groupByName}
-                    onChange={(e) => setGroupByName(e.target.checked)}
-                    className="rounded"
-                  />
-                  Group by name
-                </label>
+              <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <p className={`${theme.textSecondary} text-sm`}>
+                    {cardCount.toLocaleString()} cards in database
+                  </p>
+                  <button
+                    onClick={() => setShowSetsBrowser(true)}
+                    className={`px-3 py-1.5 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium hover:border-purple-500 transition-colors flex items-center gap-2`}
+                  >
+                    <span>📦</span>
+                    Browse Sets
+                  </button>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
+                    <input
+                      type="checkbox"
+                      checked={useScryfall}
+                      onChange={(e) => {
+                        setUseScryfall(e.target.checked)
+                        localStorage.setItem('mtg-use-scryfall', e.target.checked)
+                      }}
+                      className="rounded accent-purple-500"
+                    />
+                    <span className="flex items-center gap-1">
+                      Use Scryfall API
+                      <span className="text-xs text-purple-400">(full syntax)</span>
+                    </span>
+                  </label>
+                  <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
+                    <input
+                      type="checkbox"
+                      checked={groupByName}
+                      onChange={(e) => setGroupByName(e.target.checked)}
+                      className="rounded"
+                    />
+                    Group by name
+                  </label>
+                </div>
               </div>
             </div>
 
+            {/* Collapsible Syntax Help */}
+            <SyntaxHelp theme={theme} onSearch={handleSearch} />
+
+            {/* Set Header Banner - shows when browsing a specific set */}
+            {currentBrowsingSet && allResults.length > 0 && (
+              <div className={`${theme.bgSecondary} rounded-lg p-4 mb-4 flex items-center gap-4 border ${theme.border}`}>
+                {currentBrowsingSet.icon_svg_uri && (
+                  <img
+                    src={currentBrowsingSet.icon_svg_uri}
+                    alt={currentBrowsingSet.name}
+                    className="w-12 h-12 object-contain"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                  />
+                )}
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold">{currentBrowsingSet.name}</h3>
+                  <p className={`text-sm ${theme.textSecondary}`}>
+                    {currentBrowsingSet.code.toUpperCase()} • {currentBrowsingSet.card_count} cards • Released {currentBrowsingSet.released_at || 'TBA'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setCurrentBrowsingSet(null)
+                    setSearchResults([])
+                    setAllResults([])
+                    setLastQuery('')
+                  }}
+                  className={`px-3 py-1.5 ${theme.bgTertiary} rounded-lg text-sm hover:opacity-80`}
+                >
+                  ✕ Clear
+                </button>
+              </div>
+            )}
+
             {/* Results count */}
             {allResults.length > 0 && (
-              <p className={`${theme.textSecondary} text-sm mb-4`}>
-                Showing {searchResults.length} of {allResults.length} results
-                {allResults.length >= 500 && ' (limit reached)'}
+              <p className={`${theme.textSecondary} text-sm mb-4 flex items-center gap-2`}>
+                <span>Showing {searchResults.length} of {allResults.length} results</span>
+                {allResults.length >= 500 && <span>(limit reached)</span>}
+                {searchSource && (
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    searchSource === 'scryfall'
+                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                      : 'bg-gray-600/30 text-gray-400'
+                  }`}>
+                    via {searchSource === 'scryfall' ? 'Scryfall API' : 'Local DB'}
+                  </span>
+                )}
               </p>
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {searchResults.map(card => (
-                <div
-                  key={card.id}
-                  className="group cursor-pointer relative"
-                  onClick={() => handleCardClick(card)}
-                >
-                  {(card.image_normal || card.image_small) ? (
-                    <img
-                      src={card.image_normal || card.image_small}
-                      alt={card.name}
-                      className="w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className={`w-full aspect-[488/680] ${theme.bgSecondary} rounded-lg flex items-center justify-center`}>
-                      <span className={`${theme.textSecondary} text-sm text-center p-2`}>{card.name}</span>
-                    </div>
-                  )}
+              {searchResults.map(card => {
+                const isDFC = isDoubleFaced(card)
+                const isFlipped = flippedCards[card.id] || false
+                const cardImage = getCardImage(card, isFlipped)
 
-                  {/* Price badge with versions count */}
-                  <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                    {card.prices?.usd && (
-                      <div className="bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
-                        ${card.prices.usd}
+                return (
+                  <div
+                    key={card.id}
+                    role="button"
+                    tabIndex={0}
+                    className="group cursor-pointer relative active:scale-95 transition-transform"
+                    onClick={() => handleCardClick(card)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCardClick(card)}
+                  >
+                    {cardImage ? (
+                      <img
+                        src={cardImage}
+                        alt={card.name}
+                        className={`w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform ${isFlipped ? 'scale-x-100' : ''}`}
+                        loading="lazy"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className={`w-full aspect-[488/680] ${theme.bgSecondary} rounded-lg flex items-center justify-center`}>
+                        <span className={`${theme.textSecondary} text-sm text-center p-2`}>{card.name}</span>
                       </div>
                     )}
-                    {card._printingCount > 1 && (
-                      <div className="bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
-                        {card._printingCount}v
-                      </div>
+
+                    {/* Flip button for DFCs */}
+                    {isDFC && (
+                      <button
+                        onClick={(e) => toggleCardFlip(card.id, e)}
+                        className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Flip card"
+                      >
+                        🔄
+                      </button>
                     )}
+
+                    {/* Price and versions badges - bottom center together */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
+                      {card._printingCount > 1 && (
+                        <div className="bg-black/70 text-gray-300 text-[10px] px-1.5 py-0.5 rounded">
+                          {card._printingCount}v
+                        </div>
+                      )}
+                      {card.prices?.usd && (
+                        <div className="bg-black/80 text-green-400 text-xs px-2 py-1 rounded">
+                          ${card.prices.usd}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Load More button */}
@@ -628,6 +920,49 @@ function App() {
         )}
       </main>
 
+      {/* PWA Update Banner */}
+      {needRefresh && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-blue-600 text-white p-4 rounded-xl shadow-2xl z-[100] animate-bounce">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Update Available!</p>
+              <p className="text-sm text-blue-100">Tap to get the latest version</p>
+            </div>
+            <button
+              onClick={() => updateServiceWorker(true)}
+              className="px-4 py-2 bg-white text-blue-600 rounded-lg font-bold text-sm whitespace-nowrap"
+            >
+              Update Now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Card View - shows immediately when tapping a card */}
+      {quickViewCard && (
+        <QuickCardView
+          card={quickViewCard}
+          user={user}
+          theme={theme}
+          onClose={() => setQuickViewCard(null)}
+          onViewDetails={() => handleViewFullDetails(quickViewCard)}
+          onSaveToList={() => setShowQuickSaveModal(true)}
+        />
+      )}
+
+      {/* Save modal from quick view */}
+      {showQuickSaveModal && quickViewCard && user && (
+        <SaveToListModal
+          card={quickViewCard}
+          userId={user.uid}
+          onClose={() => {
+            setShowQuickSaveModal(false)
+            checkSyncStatus()
+          }}
+          theme={theme}
+        />
+      )}
+
       {selectedCard && (
         <CardDetail
           card={selectedCard}
@@ -638,6 +973,8 @@ function App() {
           }}
           onSelectPrinting={(card) => setSelectedCard(card)}
           user={user}
+          theme={theme}
+          onListUpdated={checkSyncStatus}
         />
       )}
 
@@ -646,7 +983,7 @@ function App() {
       )}
 
       {showLists && user && (
-        <MyLists userId={user.uid} onClose={() => setShowLists(false)} />
+        <MyLists userId={user.uid} onClose={() => { setShowLists(false); checkSyncStatus(); }} />
       )}
 
       {showSettings && (
@@ -720,6 +1057,15 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sets Browser */}
+      {showSetsBrowser && (
+        <SetsBrowser
+          theme={theme}
+          onClose={() => setShowSetsBrowser(false)}
+          onSetClick={handleSetClick}
+        />
       )}
 
     </div>
