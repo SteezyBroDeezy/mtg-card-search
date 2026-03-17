@@ -10,15 +10,24 @@ import {
 } from '../lib/search'
 import { db } from '../lib/db'
 
-function SearchBar({ onSearch, theme }) {
-  const [query, setQuery] = useState('')
+function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '' }) {
+  const [query, setQuery] = useState(initialQuery)
   const [showHelper, setShowHelper] = useState(false)
   const [activeTab, setActiveTab] = useState('colors')
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
+  const historyRef = useRef(null)
+
+  // Sync query with initialQuery when it changes (e.g. PWA restore or history click)
+  useEffect(() => {
+    if (initialQuery && initialQuery !== query) {
+      setQuery(initialQuery)
+    }
+  }, [initialQuery])
 
   // Selected filters for toggle UI
   const [selectedColors, setSelectedColors] = useState([])
@@ -49,6 +58,30 @@ function SearchBar({ onSearch, theme }) {
   const [artistValue, setArtistValue] = useState('')
   const [oracleValue, setOracleValue] = useState('')
   const [setCode, setSetCode] = useState('')
+
+  // Close history dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (historyRef.current && !historyRef.current.contains(e.target)) {
+        setShowHistoryDropdown(false)
+      }
+    }
+    if (showHistoryDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showHistoryDropdown])
+
+  function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000)
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
 
   // Normalize text for fuzzy matching (remove accents, apostrophes, etc.)
   function normalizeText(text) {
@@ -259,6 +292,8 @@ function SearchBar({ onSearch, theme }) {
     setOracleValue('')
     setSetCode('')
     setQuery('')
+    localStorage.removeItem('mtg-last-query')
+    onSearch('')
   }
 
   const tabs = [
@@ -413,9 +448,9 @@ function SearchBar({ onSearch, theme }) {
           {showSuggestions && suggestions.length > 0 && (
             <div
               ref={suggestionsRef}
-              className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden`}
               onMouseDown={(e) => e.preventDefault()}
               onTouchStart={(e) => e.preventDefault()}
+              className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden`}
             >
               {suggestions.map((name, idx) => (
                 <div
@@ -444,7 +479,7 @@ function SearchBar({ onSearch, theme }) {
         </div>
 
         {/* Quick Actions Row */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setShowHelper(!showHelper)}
@@ -456,50 +491,95 @@ function SearchBar({ onSearch, theme }) {
             <span>Filters</span>
           </button>
 
-          <div className={`h-4 w-px ${theme.border} flex-shrink-0`}></div>
-
-          {/* Quick Phrase Buttons */}
-          {quickPhrases.map(qp => (
+          {query && (
             <button
-              key={qp.label}
               type="button"
-              onClick={() => {
-                insertFilter(`o:"${qp.phrase}"`)
-                onSearch(`o:"${qp.phrase}"`)
-              }}
-              className={`flex-shrink-0 px-2.5 py-1.5 text-xs ${theme.bgTertiary} rounded-lg hover:bg-blue-600 hover:text-white transition-colors whitespace-nowrap`}
+              onClick={clearFilters}
+              className={`flex-shrink-0 px-3 py-1.5 text-sm font-medium text-red-400 ${theme.bgTertiary} rounded-lg hover:opacity-90 transition-colors`}
             >
-              {qp.label}
+              ✕ Clear
             </button>
-          ))}
+          )}
 
-          <button
-            type="button"
-            onClick={() => { setActiveTab('phrases'); setShowHelper(true) }}
-            className={`flex-shrink-0 px-2.5 py-1.5 text-xs ${theme.textSecondary} hover:opacity-80 transition-colors whitespace-nowrap`}
-          >
-            More...
-          </button>
+          {/* Search History Button */}
+          <div className="relative" ref={historyRef}>
+            <button
+              type="button"
+              onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
+              className={`flex-shrink-0 px-3 py-1.5 text-sm font-medium ${
+                showHistoryDropdown ? 'bg-blue-600 text-white' : theme.bgTertiary
+              } rounded-lg hover:opacity-90 transition-colors flex items-center gap-1`}
+            >
+              <span>🕒</span>
+              <span className="hidden sm:inline">History</span>
+            </button>
+
+            {/* History Dropdown */}
+            {showHistoryDropdown && searchHistory.length > 0 && (
+              <div className={`absolute top-full left-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 w-72 max-h-64 overflow-y-auto`}>
+                {searchHistory.slice(0, 10).map((entry, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setShowHistoryDropdown(false)
+                      setQuery(entry.query)
+                      if (onHistorySelect) {
+                        onHistorySelect(entry.query)
+                      } else {
+                        onSearch(entry.query)
+                      }
+                    }}
+                    className={`w-full px-3 py-2 text-left hover:bg-blue-600/30 transition-colors flex justify-between items-center gap-2 border-b ${theme.border} last:border-b-0`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className={`${theme.text} text-sm truncate font-medium`}>{entry.query}</p>
+                      <p className={`${theme.textSecondary} text-xs`}>
+                        {entry.resultCount} result{entry.resultCount !== 1 ? 's' : ''} · {formatTimeAgo(entry.timestamp)}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showHistoryDropdown && searchHistory.length === 0 && (
+              <div className={`absolute top-full left-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 w-56 p-4 text-center`}>
+                <p className={`${theme.textSecondary} text-sm`}>No search history yet</p>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Current query display */}
+        {query && (
+          <div className={`${theme.textSecondary} text-xs px-1`}>
+            Query: <code className="text-blue-400">{query}</code>
+          </div>
+        )}
       </form>
 
       {showHelper && (
         <div className={`mt-2 ${theme.bgSecondary} border ${theme.border} rounded-lg overflow-hidden shadow-xl`}>
-          {/* Tabs */}
-          <div className={`flex border-b ${theme.border} overflow-x-auto`}>
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-blue-600 text-white'
-                    : `${theme.textSecondary} hover:opacity-80`
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* Tabs with scroll indicator */}
+          <div className="relative">
+            <div className={`flex border-b ${theme.border} overflow-x-auto scrollbar-hide`}>
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-blue-600 text-white'
+                      : `${theme.textSecondary} hover:opacity-80`
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {/* Scroll fade hint on right */}
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-gray-800 to-transparent pointer-events-none sm:hidden" />
           </div>
 
           <div className="p-4 max-h-[60vh] overflow-y-auto">
