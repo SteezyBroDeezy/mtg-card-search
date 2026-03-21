@@ -21,6 +21,9 @@ function MyLists({ userId, onClose }) {
   const [hasUnsynced, setHasUnsynced] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [showNewList, setShowNewList] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // list to confirm deletion
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedCards, setSelectedCards] = useState(new Set())
 
   useEffect(() => {
     loadLists()
@@ -89,19 +92,47 @@ function MyLists({ userId, onClose }) {
     }
   }
 
-  async function handleDeleteList(listId) {
-    if (!confirm('Delete this list?')) return
+  function handleDeleteList(list) {
+    setDeleteConfirm(list)
+  }
+
+  async function confirmDeleteList() {
+    if (!deleteConfirm) return
     try {
-      await deleteListLocal(listId)
-      setLists(lists.filter(l => l.id !== listId))
-      if (selectedList?.id === listId) {
+      await deleteListLocal(deleteConfirm.id)
+      setLists(lists.filter(l => l.id !== deleteConfirm.id))
+      if (selectedList?.id === deleteConfirm.id) {
         setSelectedList(null)
         setCards([])
       }
       setHasUnsynced(true)
+      setDeleteConfirm(null)
     } catch (err) {
       console.error('Failed to delete list:', err)
     }
+  }
+
+  function toggleCardSelection(cardId) {
+    setSelectedCards(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId)
+      } else {
+        newSet.add(cardId)
+      }
+      return newSet
+    })
+  }
+
+  async function deleteSelectedCards() {
+    if (selectedCards.size === 0) return
+    for (const cardId of selectedCards) {
+      await removeCardFromListLocal(selectedList.id, cardId)
+    }
+    setCards(cards.filter(c => !selectedCards.has(c.cardId)))
+    setSelectedCards(new Set())
+    setSelectMode(false)
+    setHasUnsynced(true)
   }
 
   async function handleRemoveCard(cardId) {
@@ -201,32 +232,81 @@ function MyLists({ userId, onClose }) {
             ) : cards.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No cards in this list</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {cards.map(card => (
-                  <div key={card.cardId} className="relative group">
-                    <img
-                      src={card.image_normal || card.image_small}
-                      alt={card.name}
-                      className="w-full rounded-lg"
-                      loading="lazy"
-                    />
+              <>
+                {/* Select mode controls */}
+                <div className="flex items-center gap-3 mb-4">
+                  <button
+                    onClick={() => {
+                      setSelectMode(!selectMode)
+                      setSelectedCards(new Set())
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      selectMode
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    {selectMode ? '✓ Select Mode' : 'Select Cards'}
+                  </button>
+                  {selectMode && selectedCards.size > 0 && (
+                    <button
+                      onClick={deleteSelectedCards}
+                      className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium"
+                    >
+                      Delete {selectedCards.size} Selected
+                    </button>
+                  )}
+                  {selectMode && (
+                    <span className="text-gray-500 text-sm">
+                      {selectedCards.size} selected
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {cards.map(card => (
+                    <div
+                      key={card.cardId}
+                      className={`relative group cursor-pointer ${selectMode && selectedCards.has(card.cardId) ? 'ring-2 ring-purple-500 rounded-lg' : ''}`}
+                      onClick={() => selectMode && toggleCardSelection(card.cardId)}
+                    >
+                      {selectMode && (
+                        <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                          selectedCards.has(card.cardId)
+                            ? 'bg-purple-600 border-purple-600 text-white'
+                            : 'bg-black/50 border-white/50'
+                        }`}>
+                          {selectedCards.has(card.cardId) && '✓'}
+                        </div>
+                      )}
+                      <img
+                        src={card.image_normal || card.image_small}
+                        alt={card.name}
+                        className="w-full rounded-lg"
+                        loading="lazy"
+                      />
                     {card.note && (
                       <div className="mt-1 text-xs text-gray-400 truncate">{card.note}</div>
                     )}
                     {!card.synced && (
-                      <div className="absolute top-1 left-1 bg-yellow-600 text-white text-[10px] px-1 rounded">
+                      <div className="absolute top-8 left-1 bg-yellow-600 text-white text-[10px] px-1 rounded">
                         Unsynced
                       </div>
                     )}
-                    <button
-                      onClick={() => handleRemoveCard(card.cardId)}
-                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-500 text-white rounded-full w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    >
-                      ×
-                    </button>
+                    {!selectMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRemoveCard(card.cardId)
+                        }}
+                        className="absolute top-1 right-1 bg-red-600 hover:bg-red-500 text-white rounded-full w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 ))}
-              </div>
+                </div>
+              </>
             )
           ) : (
             // Lists view
@@ -293,7 +373,7 @@ function MyLists({ userId, onClose }) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleDeleteList(list.id)
+                          handleDeleteList(list)
                         }}
                         className="text-red-400 hover:text-red-300 px-2"
                       >
@@ -319,6 +399,40 @@ function MyLists({ userId, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[60]"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            className="bg-gray-800 rounded-xl p-6 max-w-sm w-full text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-4xl mb-4">⚠️</div>
+            <h3 className="text-xl font-bold text-white mb-2">Delete List?</h3>
+            <p className="text-gray-400 mb-6">
+              Are you sure you want to delete "<span className="text-white font-medium">{deleteConfirm.name}</span>"?
+              This will remove all {deleteConfirm.cardCount || 0} cards in the list.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-6 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteList}
+                className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
