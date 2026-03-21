@@ -34,6 +34,7 @@ function App() {
   const [lastQuery, setLastQuery] = useState('')
   const [searchError, setSearchError] = useState(null)
   const [selectedCard, setSelectedCard] = useState(null)
+  const [cardLoading, setCardLoading] = useState(false)
   const [allPrintings, setAllPrintings] = useState([])
   const [showAuth, setShowAuth] = useState(false)
   const [user, setUser] = useState(null)
@@ -458,11 +459,13 @@ function App() {
   async function handleViewFullDetails(card) {
     // Close quick view and open full details
     setQuickViewCard(null)
+    setCardLoading(true)
 
     // If grouped, we already have all printings
     if (card._allPrintings) {
       setAllPrintings(card._allPrintings)
       setSelectedCard(card)
+      setCardLoading(false)
     } else {
       // Fetch all printings of this card
       const printings = await db.cards
@@ -473,6 +476,7 @@ function App() {
       printings.sort((a, b) => getCardPrice(a) - getCardPrice(b))
       setAllPrintings(printings)
       setSelectedCard(card)
+      setCardLoading(false)
     }
   }
 
@@ -703,17 +707,6 @@ function App() {
                     Browse Sets
                   </button>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
-                    <input
-                      type="checkbox"
-                      checked={groupByName}
-                      onChange={(e) => setGroupByName(e.target.checked)}
-                      className="rounded"
-                    />
-                    Group by name
-                  </label>
-                </div>
               </div>
             </div>
 
@@ -939,6 +932,15 @@ function App() {
           }}
           theme={theme}
         />
+      )}
+
+      {cardLoading && !selectedCard && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+          <div className={`${theme.bgSecondary} rounded-xl p-8 text-center shadow-2xl`}>
+            <div className="text-5xl animate-bounce mb-4">🧙</div>
+            <p className={`${theme.textSecondary}`}>Summoning card details...</p>
+          </div>
+        </div>
       )}
 
       {selectedCard && (
