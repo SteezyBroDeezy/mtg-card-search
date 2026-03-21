@@ -7,6 +7,7 @@ function SetsBrowser({ theme, onClose, onSetClick }) {
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [majorSetsOnly, setMajorSetsOnly] = useState(false)
   const [displayCount, setDisplayCount] = useState(50)
 
   // Set types to filter by
@@ -28,7 +29,7 @@ function SetsBrowser({ theme, onClose, onSetClick }) {
 
   useEffect(() => {
     filterSets()
-  }, [sets, searchQuery, typeFilter])
+  }, [sets, searchQuery, typeFilter, majorSetsOnly])
 
   async function loadSets() {
     try {
@@ -53,6 +54,11 @@ function SetsBrowser({ theme, onClose, onSetClick }) {
 
   function filterSets() {
     let filtered = sets
+
+    // Filter by major sets (100+ cards)
+    if (majorSetsOnly) {
+      filtered = filtered.filter(s => s.card_count >= 100)
+    }
 
     // Filter by type
     if (typeFilter !== 'all') {
@@ -168,6 +174,17 @@ function SetsBrowser({ theme, onClose, onSetClick }) {
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
+
+          {/* Major Sets Toggle */}
+          <label className={`flex items-center gap-2 px-4 py-2 ${theme.bgTertiary} rounded-lg border ${theme.border} cursor-pointer`}>
+            <input
+              type="checkbox"
+              checked={majorSetsOnly}
+              onChange={(e) => setMajorSetsOnly(e.target.checked)}
+              className="rounded accent-purple-500"
+            />
+            <span className="text-sm whitespace-nowrap">Major Sets (100+ cards)</span>
+          </label>
         </div>
       </div>
 

@@ -147,7 +147,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
                   <img
                     src={displayImage}
                     alt={displayName}
-                    className="w-full rounded-lg shadow-xl"
+                    className="w-full rounded-lg shadow-xl card-image-saveable"
                   />
                 ) : (
                   <div className="w-full aspect-[488/680] bg-gray-700 rounded-lg flex items-center justify-center">
@@ -185,19 +185,28 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
                 </div>
               )}
 
-              {/* Watchlist Button */}
-              <button
-                onClick={handleWatchlistToggle}
-                disabled={watchlistLoading}
-                className={`mt-4 px-4 py-2 ${
-                  inWatchlist
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-purple-600 hover:bg-purple-700'
-                } text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50`}
-              >
-                <span>{inWatchlist ? '✓' : '◆'}</span>
-                {watchlistLoading ? 'Saving...' : inWatchlist ? 'In Watchlist' : 'Track Price'}
-              </button>
+              {/* Action Buttons - Save to List & Watchlist */}
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={handleSaveClick}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+                >
+                  <span>+</span>
+                  Save to List
+                </button>
+                <button
+                  onClick={handleWatchlistToggle}
+                  disabled={watchlistLoading}
+                  className={`px-4 py-2 ${
+                    inWatchlist
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  } text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50`}
+                >
+                  <span>{inWatchlist ? '✓' : '◆'}</span>
+                  {watchlistLoading ? 'Saving...' : inWatchlist ? 'Watching' : 'Track Price'}
+                </button>
+              </div>
               {watchlistError && (
                 <p className="text-red-400 text-xs mt-1 max-w-[300px] text-center">{watchlistError}</p>
               )}

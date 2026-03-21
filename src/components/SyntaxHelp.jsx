@@ -313,8 +313,8 @@ function SyntaxHelp({ theme, onSearch }) {
           {/* Tips */}
           <div className={`mt-3 pt-3 border-t ${theme.border} text-xs ${theme.textSecondary}`}>
             <span className="text-purple-400 font-semibold">Tips: </span>
-            Combine filters with spaces. Use <code className="text-purple-400">otag:</code> for functional searches (requires Scryfall API).
-            Prefix with <code className="text-red-400">-</code> to exclude. Enable "Use Scryfall API" for full syntax support including oracle tags.
+            Combine filters with spaces. Prefix with <code className="text-red-400">-</code> to exclude.
+            Use <code className="text-purple-400">otag:</code> for functional searches (works offline!).
           </div>
         </div>
       )}

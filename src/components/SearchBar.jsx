@@ -441,8 +441,27 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="Search cards..."
-            className={`w-full px-4 py-3 pr-24 ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
+            className={`w-full px-4 py-3 ${query ? 'pr-32' : 'pr-24'} ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
           />
+
+          {/* Clear button - shows when there's text */}
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('')
+                setSuggestions([])
+                setShowSuggestions(false)
+                inputRef.current?.focus()
+              }}
+              className={`absolute right-20 top-1/2 -translate-y-1/2 p-1.5 ${theme.textSecondary} hover:text-white rounded-full hover:bg-gray-600 transition-colors`}
+              title="Clear search"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
 
           {/* Autocomplete Suggestions */}
           {showSuggestions && suggestions.length > 0 && (

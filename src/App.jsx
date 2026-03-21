@@ -56,10 +56,6 @@ function App() {
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [quickViewCard, setQuickViewCard] = useState(null)
   const [showQuickSaveModal, setShowQuickSaveModal] = useState(false)
-  const [useScryfall, setUseScryfall] = useState(() => {
-    const saved = localStorage.getItem('mtg-use-scryfall')
-    return saved === 'true'
-  })
   const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
@@ -344,13 +340,10 @@ function App() {
 
     const { filters, nameSearch, requiresScryfall } = parseSearch(query)
 
-    // Determine if we should use Scryfall API
-    const shouldUseScryfall = useScryfall || requiresScryfall
-
     let results
     try {
-      // Use Scryfall API if toggle is on or query requires it
-      if (shouldUseScryfall) {
+      // Use Scryfall API only when query requires it (e.g., otag: searches)
+      if (requiresScryfall) {
         setSearchSource('scryfall')
         results = await searchScryfall(query)
       } else {
@@ -571,7 +564,7 @@ function App() {
                     syncing
                       ? 'bg-gray-600 text-gray-400 cursor-wait'
                       : hasUnsynced
-                      ? 'bg-yellow-600 hover:bg-yellow-500 text-white animate-pulse'
+                      ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
                       : 'bg-green-700/50 hover:bg-green-600 text-green-300'
                   }`}
                   title={hasUnsynced ? 'Sync pending changes' : `Last synced: ${formatSyncTime(lastSyncTime)}`}
@@ -714,21 +707,6 @@ function App() {
                   <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
                     <input
                       type="checkbox"
-                      checked={useScryfall}
-                      onChange={(e) => {
-                        setUseScryfall(e.target.checked)
-                        localStorage.setItem('mtg-use-scryfall', e.target.checked)
-                      }}
-                      className="rounded accent-purple-500"
-                    />
-                    <span className="flex items-center gap-1">
-                      Use Scryfall API
-                      <span className="text-xs text-purple-400">(full syntax)</span>
-                    </span>
-                  </label>
-                  <label className={`flex items-center gap-2 text-sm ${theme.textSecondary} cursor-pointer`}>
-                    <input
-                      type="checkbox"
                       checked={groupByName}
                       onChange={(e) => setGroupByName(e.target.checked)}
                       className="rounded"
@@ -809,7 +787,7 @@ function App() {
                       <img
                         src={cardImage}
                         alt={card.name}
-                        className={`w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform ${isFlipped ? 'scale-x-100' : ''}`}
+                        className={`w-full rounded-lg shadow-lg group-hover:scale-105 transition-transform card-image-saveable ${isFlipped ? 'scale-x-100' : ''}`}
                         loading="lazy"
                         draggable={false}
                       />
