@@ -467,9 +467,10 @@ function App() {
       setSelectedCard(card)
       setCardLoading(false)
     } else {
-      // Fetch all printings of this card
+      // Fetch all printings using indexed query (much faster than filter)
       const printings = await db.cards
-        .filter(c => c.name === card.name)
+        .where('name')
+        .equals(card.name)
         .toArray()
 
       // Sort by price
