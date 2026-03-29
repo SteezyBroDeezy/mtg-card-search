@@ -461,10 +461,11 @@ function App() {
     setQuickViewCard(null)
     setCardLoading(true)
 
-    // If grouped, we already have all printings
+    // If grouped, we already have all printings (sorted by price)
     if (card._allPrintings) {
       setAllPrintings(card._allPrintings)
-      setSelectedCard(card)
+      // Select the cheapest version (first in the sorted array)
+      setSelectedCard(card._allPrintings[0])
       setCardLoading(false)
     } else {
       // Fetch all printings using indexed query (much faster than filter)
@@ -473,10 +474,11 @@ function App() {
         .equals(card.name)
         .toArray()
 
-      // Sort by price
+      // Sort by price (cheapest first)
       printings.sort((a, b) => getCardPrice(a) - getCardPrice(b))
       setAllPrintings(printings)
-      setSelectedCard(card)
+      // Select the cheapest version (first in the sorted array)
+      setSelectedCard(printings[0])
       setCardLoading(false)
     }
   }
