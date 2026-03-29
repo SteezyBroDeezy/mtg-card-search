@@ -107,24 +107,61 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
       try {
         const normalizedQuery = normalizeText(trimmed)
+        const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
 
-        // First try startsWithIgnoreCase (faster, indexed)
-        let results = await db.cards
-          .where('name')
-          .startsWithIgnoreCase(trimmed)
-          .limit(20)
-          .toArray()
-
-        // If no results, fall back to normalized fuzzy search
-        if (results.length === 0) {
-          results = await db.cards
-            .filter(card => normalizeText(card.name).includes(normalizedQuery))
-            .limit(20)
+        // Run both searches in parallel for better results
+        const [startsWithResults, containsResults] = await Promise.all([
+          // Exact prefix match (fast, indexed)
+          db.cards
+            .where('name')
+            .startsWithIgnoreCase(trimmed)
+            .limit(15)
+            .toArray(),
+          // Contains search - matches any word in the name
+          db.cards
+            .filter(card => {
+              const normalizedName = normalizeText(card.name)
+              // Check if ALL query words appear somewhere in the name
+              return queryWords.every(word => normalizedName.includes(word))
+            })
+            .limit(30)
             .toArray()
+        ])
+
+        // Combine and deduplicate, prioritizing startsWith matches
+        const seenNames = new Set()
+        const combined = []
+
+        // Add startsWith matches first (higher priority)
+        for (const card of startsWithResults) {
+          if (!seenNames.has(card.name)) {
+            seenNames.add(card.name)
+            combined.push({ name: card.name, priority: 1 })
+          }
         }
 
-        // Get unique card names - show up to 12 suggestions
-        const uniqueNames = [...new Set(results.map(c => c.name))].slice(0, 12)
+        // Add contains matches (these include reprints and partial matches)
+        for (const card of containsResults) {
+          if (!seenNames.has(card.name)) {
+            seenNames.add(card.name)
+            // Higher priority if query appears as a word boundary (not mid-word)
+            const nameLower = card.name.toLowerCase()
+            const queryLower = trimmed.toLowerCase()
+            const wordBoundary = nameLower.includes(' ' + queryLower) ||
+                                 nameLower.includes(queryLower + ' ') ||
+                                 nameLower.startsWith(queryLower)
+            combined.push({ name: card.name, priority: wordBoundary ? 2 : 3 })
+          }
+        }
+
+        // Sort by priority, then alphabetically
+        combined.sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority
+          return a.name.localeCompare(b.name)
+        })
+
+        // Get top 12 suggestions
+        const uniqueNames = combined.slice(0, 12).map(c => c.name)
         setSuggestions(uniqueNames)
         setShowSuggestions(uniqueNames.length > 0)
         setSelectedSuggestionIndex(-1)

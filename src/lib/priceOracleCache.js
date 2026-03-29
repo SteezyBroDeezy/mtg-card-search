@@ -103,19 +103,68 @@ export async function pushToFirebase(userId) {
   }
 }
 
-// Full sync: pull from Firebase, merge, push back
+// Full sync: pull from Firebase, MERGE with local, push back
 export async function fullSync(userId) {
   if (!userId) return { success: false, error: 'Not logged in' }
 
   try {
-    // First push any local changes
-    if (pendingChanges) {
-      await pushToFirebase(userId)
+    // Get remote data from Firebase
+    console.log('Fetching remote Price Oracle data...')
+    const remoteData = await getPriceOracleData(userId)
+
+    // Merge watchlists - combine unique cards from both local and remote
+    const localWatchlist = memoryCache?.watchlist || []
+    const remoteWatchlist = remoteData?.watchlist || []
+    const watchlistMap = new Map()
+
+    // Add remote items first
+    for (const card of remoteWatchlist) {
+      watchlistMap.set(card.id, card)
+    }
+    // Add/update with local items (local takes priority for same card)
+    for (const card of localWatchlist) {
+      watchlistMap.set(card.id, card)
+    }
+    const mergedWatchlist = Array.from(watchlistMap.values())
+
+    // Merge alerts - combine unique alerts from both local and remote
+    const localAlerts = memoryCache?.alerts || []
+    const remoteAlerts = remoteData?.alerts || []
+    const alertsMap = new Map()
+
+    // Add remote alerts first
+    for (const alert of remoteAlerts) {
+      alertsMap.set(alert.id, alert)
+    }
+    // Add/update with local alerts (local takes priority for same alert)
+    for (const alert of localAlerts) {
+      alertsMap.set(alert.id, alert)
+    }
+    const mergedAlerts = Array.from(alertsMap.values())
+
+    // Update memory cache with merged data
+    memoryCache = {
+      watchlist: mergedWatchlist,
+      alerts: mergedAlerts
     }
 
-    // Then pull latest from Firebase
-    await refreshFromFirebase(userId)
+    // Push merged data back to Firebase
+    console.log('Pushing merged data to Firebase...')
+    await savePriceOracleData(userId, memoryCache)
 
+    // Save to IndexedDB
+    lastSyncTime = Date.now()
+    await db.meta.put({
+      key: CACHE_KEY,
+      value: {
+        data: memoryCache,
+        timestamp: lastSyncTime,
+        userId
+      }
+    })
+
+    pendingChanges = false
+    console.log(`Sync complete: ${mergedWatchlist.length} watchlist items, ${mergedAlerts.length} alerts`)
     return { success: true }
   } catch (e) {
     console.error('Full sync failed:', e)
