@@ -9,6 +9,7 @@ function processCard(card) {
   let cardData = {
     id: card.id,
     name: card.name,
+    flavor_name: card.flavor_name || '', // Secret Lair / Universe Beyond alternate names
     type_line: card.type_line || '',
     mana_cost: card.mana_cost || '',
     cmc: card.cmc || 0,

@@ -3,6 +3,17 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
+// Version 5 - Added flavor_name for Secret Lair / Universe Beyond alternate names
+db.version(5).stores({
+  cards: 'id, name, flavor_name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
+  meta: 'key',
+  lists: 'id, name, createdAt, updatedAt, synced',
+  listCards: '[listId+cardId], listId, cardId, addedAt, synced'
+}).upgrade(tx => {
+  // Clear cards to force re-download with flavor_name field
+  return tx.table('cards').clear()
+})
+
 // Version 4 - Added local lists support for offline
 db.version(4).stores({
   cards: 'id, name, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',

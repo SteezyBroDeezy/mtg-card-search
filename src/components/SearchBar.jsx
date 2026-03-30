@@ -109,9 +109,9 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         const normalizedQuery = normalizeText(trimmed)
         const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
 
-        // Run both searches in parallel for better results
-        const [startsWithResults, containsResults] = await Promise.all([
-          // Exact prefix match (fast, indexed)
+        // Run multiple searches in parallel for better results
+        const [startsWithResults, containsResults, flavorNameResults] = await Promise.all([
+          // Exact prefix match on name (fast, indexed)
           db.cards
             .where('name')
             .startsWithIgnoreCase(trimmed)
@@ -125,6 +125,12 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
               return queryWords.every(word => normalizedName.includes(word))
             })
             .limit(30)
+            .toArray(),
+          // Search flavor_name for Secret Lair / Universe Beyond cards
+          db.cards
+            .where('flavor_name')
+            .startsWithIgnoreCase(trimmed)
+            .limit(15)
             .toArray()
         ])
 
@@ -136,7 +142,20 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         for (const card of startsWithResults) {
           if (!seenNames.has(card.name)) {
             seenNames.add(card.name)
-            combined.push({ name: card.name, priority: 1 })
+            combined.push({ name: card.name, displayName: card.name, priority: 1 })
+          }
+        }
+
+        // Add flavor_name matches (Secret Lair alternate names like "Heralds of the Shredder")
+        for (const card of flavorNameResults) {
+          if (!seenNames.has(card.name) && card.flavor_name) {
+            seenNames.add(card.name)
+            // Show flavor name with real name in parentheses
+            combined.push({
+              name: card.name,
+              displayName: `${card.flavor_name} (${card.name})`,
+              priority: 1.5
+            })
           }
         }
 
@@ -150,20 +169,38 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             const wordBoundary = nameLower.includes(' ' + queryLower) ||
                                  nameLower.includes(queryLower + ' ') ||
                                  nameLower.startsWith(queryLower)
-            combined.push({ name: card.name, priority: wordBoundary ? 2 : 3 })
+            combined.push({ name: card.name, displayName: card.name, priority: wordBoundary ? 2 : 3 })
+          }
+        }
+
+        // Also search flavor_name with contains
+        for (const card of [...startsWithResults, ...containsResults]) {
+          if (card.flavor_name && !seenNames.has(card.name)) {
+            const normalizedFlavor = normalizeText(card.flavor_name)
+            if (queryWords.every(word => normalizedFlavor.includes(word))) {
+              seenNames.add(card.name)
+              combined.push({
+                name: card.name,
+                displayName: `${card.flavor_name} (${card.name})`,
+                priority: 2
+              })
+            }
           }
         }
 
         // Sort by priority, then alphabetically
         combined.sort((a, b) => {
           if (a.priority !== b.priority) return a.priority - b.priority
-          return a.name.localeCompare(b.name)
+          return a.displayName.localeCompare(b.displayName)
         })
 
-        // Get top 12 suggestions
-        const uniqueNames = combined.slice(0, 12).map(c => c.name)
-        setSuggestions(uniqueNames)
-        setShowSuggestions(uniqueNames.length > 0)
+        // Get top 12 suggestions - use displayName for showing, name for search
+        const suggestions = combined.slice(0, 12).map(c => ({
+          displayName: c.displayName,
+          searchName: c.name
+        }))
+        setSuggestions(suggestions)
+        setShowSuggestions(suggestions.length > 0)
         setSelectedSuggestionIndex(-1)
       } catch (err) {
         console.error('Suggestion error:', err)
@@ -175,10 +212,13 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     return () => clearTimeout(debounce)
   }, [query])
 
-  function handleSuggestionClick(name) {
-    setQuery(name)
+  function handleSuggestionClick(suggestion) {
+    // suggestion can be object {displayName, searchName} or string (for backwards compatibility)
+    const searchName = typeof suggestion === 'object' ? suggestion.searchName : suggestion
+    const displayName = typeof suggestion === 'object' ? suggestion.displayName : suggestion
+    setQuery(displayName)
     setShowSuggestions(false)
-    onSearch(name)
+    onSearch(searchName)
   }
 
   function handleKeyDown(e) {
@@ -194,7 +234,8 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
       setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1)
     } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
       e.preventDefault()
-      handleSuggestionClick(suggestions[selectedSuggestionIndex])
+      const suggestion = suggestions[selectedSuggestionIndex]
+      handleSuggestionClick(suggestion)
     } else if (e.key === 'Escape') {
       setShowSuggestions(false)
     }
@@ -508,20 +549,24 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
               onTouchStart={(e) => e.preventDefault()}
               className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden`}
             >
-              {suggestions.map((name, idx) => (
-                <div
-                  key={name}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleSuggestionClick(name)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSuggestionClick(name)}
-                  className={`w-full px-4 py-3 text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer ${
-                    idx === selectedSuggestionIndex ? 'bg-blue-600/40' : ''
-                  } ${theme.text}`}
-                >
-                  {name}
-                </div>
-              ))}
+              {suggestions.map((suggestion, idx) => {
+                const displayName = typeof suggestion === 'object' ? suggestion.displayName : suggestion
+                const key = typeof suggestion === 'object' ? suggestion.searchName : suggestion
+                return (
+                  <div
+                    key={key}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSuggestionClick(suggestion)}
+                    className={`w-full px-4 py-3 text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer ${
+                      idx === selectedSuggestionIndex ? 'bg-blue-600/40' : ''
+                    } ${theme.text}`}
+                  >
+                    {displayName}
+                  </div>
+                )
+              })}
             </div>
           )}
 
