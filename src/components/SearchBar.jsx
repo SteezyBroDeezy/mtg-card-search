@@ -768,7 +768,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             {/* Types Tab */}
             {activeTab === 'types' && (
               <div>
-                <p className={`${theme.textSecondary} text-sm mb-3`}>Select card types:</p>
+                <p className={`${theme.textSecondary} text-sm mb-3`}>Card Types:</p>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {TYPE_OPTIONS.map(type => (
                     <button
@@ -783,6 +783,70 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                       {type}
                     </button>
                   ))}
+                </div>
+
+                <div className="mt-4">
+                  <p className={`${theme.textSecondary} text-sm mb-2`}>Popular Creature Types:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Dragon', 'Elf', 'Zombie', 'Goblin', 'Human', 'Angel', 'Demon', 'Wizard', 'Vampire', 'Merfolk', 'Knight', 'Warrior', 'Soldier', 'Cleric', 'Rogue', 'Shaman'].map(subtype => (
+                      <button
+                        key={subtype}
+                        onClick={() => insertFilter(`t:${subtype.toLowerCase()}`)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.bgTertiary} hover:bg-blue-600 hover:text-white`}
+                      >
+                        {subtype}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className={`${theme.textSecondary} text-sm mb-2`}>More Creature Types:</p>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                    {['Beast', 'Elemental', 'Spirit', 'Dinosaur', 'Bird', 'Cat', 'Dog', 'Snake', 'Spider', 'Rat', 'Turtle', 'Ninja', 'Samurai', 'Pirate', 'Horror', 'Faerie', 'Giant', 'Treefolk', 'Hydra', 'Sphinx', 'Phoenix', 'Drake', 'Minotaur', 'Werewolf', 'Dwarf', 'Bear', 'Sliver', 'Changeling', 'Avatar', 'God', 'Phyrexian', 'Eldrazi', 'Ally', 'Monk', 'Artificer', 'Druid', 'Assassin', 'Berserker', 'Scout', 'Archer'].map(subtype => (
+                      <button
+                        key={subtype}
+                        onClick={() => insertFilter(`t:${subtype.toLowerCase()}`)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${theme.bgTertiary} hover:bg-blue-600 hover:text-white`}
+                      >
+                        {subtype}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className={`${theme.textSecondary} text-sm mb-2`}>Custom Type:</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="customTypeInput"
+                      placeholder="e.g. squirrel, frog, ox..."
+                      className={`flex-1 px-3 py-2 ${theme.bgTertiary} rounded-lg text-sm`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const val = e.target.value.trim()
+                          if (val) {
+                            insertFilter(`t:${val.toLowerCase()}`)
+                            e.target.value = ''
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById('customTypeInput')
+                        const val = input.value.trim()
+                        if (val) {
+                          insertFilter(`t:${val.toLowerCase()}`)
+                          input.value = ''
+                        }
+                      }}
+                      className={`px-4 py-2 ${theme.bgTertiary} rounded-lg text-sm hover:bg-blue-600 hover:text-white`}
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-4">
