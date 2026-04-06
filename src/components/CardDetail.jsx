@@ -137,6 +137,36 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
           <div className="p-3 sm:p-4 flex flex-col lg:flex-row gap-4 sm:gap-6">
             {/* Left Column - Card Image - Full width on mobile */}
             <div className="flex-shrink-0 flex flex-col items-center w-full lg:w-auto">
+              {/* Back face preview thumbnail for DFCs */}
+              {hasMultipleFaces && (
+                <div
+                  className="mb-2 cursor-pointer hover:scale-105 transition-transform"
+                  onClick={flipCard}
+                  title={`Click to see: ${card.card_faces[(currentFace + 1) % card.card_faces.length]?.name}`}
+                >
+                  <div className="relative">
+                    <img
+                      src={
+                        card.card_faces[(currentFace + 1) % card.card_faces.length]?.image_small ||
+                        card.card_faces[(currentFace + 1) % card.card_faces.length]?.image_uris?.small ||
+                        card.card_faces[(currentFace + 1) % card.card_faces.length]?.image_normal ||
+                        card.card_faces[(currentFace + 1) % card.card_faces.length]?.image_uris?.normal || ''
+                      }
+                      alt={card.card_faces[(currentFace + 1) % card.card_faces.length]?.name}
+                      className="w-16 h-auto rounded shadow-lg border-2 border-gray-600 hover:border-blue-500 transition-colors"
+                    />
+                    <div className="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-1">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 text-center mt-1 max-w-16 truncate">
+                    {card.card_faces[(currentFace + 1) % card.card_faces.length]?.name?.split(' //')[0]}
+                  </p>
+                </div>
+              )}
+
               <div
                 className={`relative cursor-pointer transition-transform duration-150 w-full max-w-[350px] sm:max-w-[300px] mx-auto ${
                   isFlipping ? 'scale-95 opacity-80' : ''
