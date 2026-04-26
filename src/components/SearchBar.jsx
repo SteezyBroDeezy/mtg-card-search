@@ -10,7 +10,7 @@ import {
 } from '../lib/search'
 import { db } from '../lib/db'
 
-function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '' }) {
+function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false }) {
   const [query, setQuery] = useState(initialQuery)
   const [showHelper, setShowHelper] = useState(false)
   const [activeTab, setActiveTab] = useState('colors')
@@ -96,12 +96,38 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
   // Fetch card name suggestions
   useEffect(() => {
+    let cancelled = false
+
     const fetchSuggestions = async () => {
       // Only suggest if typing a plain name (no filter syntax)
       const trimmed = query.trim()
       if (!trimmed || trimmed.includes(':') || trimmed.includes('=') || trimmed.length < 2) {
         setSuggestions([])
         setShowSuggestions(false)
+        return
+      }
+
+      // Online mode: use Scryfall's autocomplete endpoint (returns just names).
+      if (useScryfallAutocomplete) {
+        try {
+          const res = await fetch(
+            `https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(trimmed)}`
+          )
+          const data = await res.json()
+          if (cancelled) return
+          const names = Array.isArray(data?.data) ? data.data : []
+          const suggestions = names.slice(0, 12).map(name => ({
+            displayName: name,
+            searchName: name
+          }))
+          setSuggestions(suggestions)
+          setShowSuggestions(suggestions.length > 0)
+          setSelectedSuggestionIndex(-1)
+        } catch (err) {
+          if (cancelled) return
+          console.error('Scryfall autocomplete error:', err)
+          setSuggestions([])
+        }
         return
       }
 
@@ -133,6 +159,10 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             .limit(15)
             .toArray()
         ])
+
+        // Drop results from a stale query — if the user typed more letters
+        // while we were waiting, the newer query's results must win.
+        if (cancelled) return
 
         // Combine and deduplicate, prioritizing startsWith matches
         const seenNames = new Set()
@@ -203,14 +233,18 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         setShowSuggestions(suggestions.length > 0)
         setSelectedSuggestionIndex(-1)
       } catch (err) {
+        if (cancelled) return
         console.error('Suggestion error:', err)
         setSuggestions([])
       }
     }
 
     const debounce = setTimeout(fetchSuggestions, 150)
-    return () => clearTimeout(debounce)
-  }, [query])
+    return () => {
+      cancelled = true
+      clearTimeout(debounce)
+    }
+  }, [query, useScryfallAutocomplete])
 
   function handleSuggestionClick(suggestion) {
     // suggestion can be object {displayName, searchName} or string (for backwards compatibility)
@@ -573,9 +607,20 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           {/* Search button inside input on right */}
           <button
             type="submit"
-            className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 ${theme.accent} text-white rounded-lg font-medium text-sm`}
+            disabled={isSearching}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 ${theme.accent} text-white rounded-lg font-medium text-sm flex items-center gap-1.5 ${isSearching ? 'opacity-80 cursor-wait' : ''}`}
           >
-            Search
+            {isSearching ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                  <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                <span>Searching</span>
+              </>
+            ) : (
+              'Search'
+            )}
           </button>
         </div>
 

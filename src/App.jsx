@@ -24,10 +24,26 @@ import {
 } from './lib/priceOracleCache'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
+// True when the app is running as an installed PWA (standalone display mode).
+// iOS Safari sets navigator.standalone; everyone else uses the matchMedia check.
+function isStandalonePWA() {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true
+  if (window.navigator.standalone === true) return true
+  return false
+}
+
 function App() {
   const [dbStatus, setDbStatus] = useState('checking')
   const [cardCount, setCardCount] = useState(0)
   const [downloadProgress, setDownloadProgress] = useState(null)
+  // 'online' = query Scryfall API live, no DB needed.
+  // 'offline' = use local IndexedDB. PWA defaults to offline; web defaults to online.
+  const [appMode, setAppMode] = useState(() => {
+    const saved = localStorage.getItem('mtg-app-mode')
+    if (saved === 'online' || saved === 'offline') return saved
+    return isStandalonePWA() ? 'offline' : 'online'
+  })
   const [searchResults, setSearchResults] = useState([])
   const [allResults, setAllResults] = useState([])
   const [displayCount, setDisplayCount] = useState(50)
@@ -58,6 +74,7 @@ function App() {
   const [quickViewCard, setQuickViewCard] = useState(null)
   const [showQuickSaveModal, setShowQuickSaveModal] = useState(false)
   const [searchSource, setSearchSource] = useState(null) // 'local' or 'scryfall' - shows which was used
+  const [isSearching, setIsSearching] = useState(false)
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
   const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
@@ -158,6 +175,10 @@ function App() {
     localStorage.setItem('mtg-group-by-name', groupByName.toString())
   }, [groupByName])
 
+  useEffect(() => {
+    localStorage.setItem('mtg-app-mode', appMode)
+  }, [appMode])
+
   // Save search history to localStorage
   useEffect(() => {
     localStorage.setItem('mtg-search-history', JSON.stringify(searchHistory.slice(0, 20)))
@@ -201,16 +222,31 @@ function App() {
       const info = await getDbInfo()
       setCardCount(info.cardCount)
       setDbStatus('ready')
-
-      // Restore last search when PWA reopens
-      const savedQuery = localStorage.getItem('mtg-last-query')
-      if (savedQuery) {
-        handleSearch(savedQuery)
-      }
+      // Don't call handleSearch here — its closure would still see
+      // dbStatus='checking' and misroute the restored query to Scryfall.
+      // The restore happens in the useEffect below, keyed on dbStatus.
     } else {
       setDbStatus('empty')
+      // Installed PWA must work offline — kick off the download immediately.
+      // Browser users stay in online mode unless they explicitly opt in.
+      if (isStandalonePWA()) {
+        handleDownload()
+      }
     }
   }
+
+  // Restore the last search once we know the DB and mode are settled.
+  // Runs once on first transition into a usable state.
+  const [didRestoreQuery, setDidRestoreQuery] = useState(false)
+  useEffect(() => {
+    if (didRestoreQuery) return
+    if (dbStatus !== 'ready' && appMode !== 'online') return
+    const savedQuery = localStorage.getItem('mtg-last-query')
+    if (savedQuery) {
+      handleSearch(savedQuery)
+    }
+    setDidRestoreQuery(true)
+  }, [dbStatus, appMode, didRestoreQuery])
 
   async function handleDownload() {
     setDbStatus('downloading')
@@ -339,59 +375,65 @@ function App() {
       return
     }
 
-    const { filters, nameSearch, requiresScryfall } = parseSearch(query)
-
-    let results
+    setIsSearching(true)
     try {
-      // Use Scryfall API only when query requires it (e.g., otag: searches)
-      if (requiresScryfall) {
-        setSearchSource('scryfall')
-        results = await searchScryfall(query)
-      } else {
-        setSearchSource('local')
-        if (filters.length === 0 && nameSearch) {
-          results = await db.cards
-            .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
-            .limit(500)
-            .toArray()
+      const { filters, nameSearch, requiresScryfall } = parseSearch(query)
+      // Online mode (or no local DB available) → always go through Scryfall.
+      const useScryfall = requiresScryfall || appMode === 'online' || dbStatus !== 'ready'
+
+      let results
+      try {
+        if (useScryfall) {
+          setSearchSource('scryfall')
+          results = await searchScryfall(query)
         } else {
-          results = await db.cards
-            .filter(card => matchesFilters(card, filters, nameSearch))
-            .limit(500)
-            .toArray()
+          setSearchSource('local')
+          if (filters.length === 0 && nameSearch) {
+            results = await db.cards
+              .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
+              .limit(500)
+              .toArray()
+          } else {
+            results = await db.cards
+              .filter(card => matchesFilters(card, filters, nameSearch))
+              .limit(500)
+              .toArray()
+          }
         }
+      } catch (err) {
+        console.error('Search error:', err)
+        setSearchError({
+          type: 'error',
+          message: 'Search failed',
+          suggestion: 'Try a simpler search or check your syntax.'
+        })
+        setSearchResults([])
+        setAllResults([])
+        return
       }
-    } catch (err) {
-      console.error('Search error:', err)
-      setSearchError({
-        type: 'error',
-        message: 'Search failed',
-        suggestion: 'Try a simpler search or check your syntax.'
-      })
-      setSearchResults([])
-      setAllResults([])
-      return
+
+      let finalResults
+      if (groupByName) {
+        finalResults = groupCardsByName(results)
+      } else {
+        finalResults = results
+      }
+
+      // Generate helpful feedback if no results
+      if (finalResults.length === 0) {
+        const errorInfo = getSearchHelpMessage(query, filters, nameSearch)
+        setSearchError(errorInfo)
+      }
+
+      // Add to search history
+      addToHistory(query, finalResults.length)
+
+      setAllResults(finalResults)
+      setSearchResults(finalResults.slice(0, 50))
+      setDisplayCount(50)
+    } finally {
+      setIsSearching(false)
     }
-
-    let finalResults
-    if (groupByName) {
-      finalResults = groupCardsByName(results)
-    } else {
-      finalResults = results
-    }
-
-    // Generate helpful feedback if no results
-    if (finalResults.length === 0) {
-      const errorInfo = getSearchHelpMessage(query, filters, nameSearch)
-      setSearchError(errorInfo)
-    }
-
-    // Add to search history
-    addToHistory(query, finalResults.length)
-
-    setAllResults(finalResults)
-    setSearchResults(finalResults.slice(0, 50))
-    setDisplayCount(50)
   }
 
   // Generate helpful error messages based on the search
@@ -467,20 +509,45 @@ function App() {
       // Select the cheapest version (first in the sorted array)
       setSelectedCard(card._allPrintings[0])
       setCardLoading(false)
-    } else {
-      // Fetch all printings using indexed query (much faster than filter)
-      const printings = await db.cards
-        .where('name')
-        .equals(card.name)
-        .toArray()
-
-      // Sort by price (cheapest first)
-      printings.sort((a, b) => getCardPrice(a) - getCardPrice(b))
-      setAllPrintings(printings)
-      // Select the cheapest version (first in the sorted array)
-      setSelectedCard(printings[0])
-      setCardLoading(false)
+      return
     }
+
+    let printings = []
+    try {
+      if (dbStatus === 'ready') {
+        // Fetch all printings using indexed query (much faster than filter)
+        printings = await db.cards
+          .where('name')
+          .equals(card.name)
+          .toArray()
+      } else if (card.prints_search_uri) {
+        // Online mode — Scryfall gives us a ready-made URL for every printing.
+        const res = await fetch(card.prints_search_uri)
+        const data = await res.json()
+        if (data.data) {
+          printings = data.data.map(c => ({
+            ...c,
+            image_small: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small,
+            image_normal: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
+            image_large: c.image_uris?.large || c.card_faces?.[0]?.image_uris?.large,
+            image_art_crop: c.image_uris?.art_crop || c.card_faces?.[0]?.image_uris?.art_crop
+          }))
+        }
+      }
+    } catch (err) {
+      console.error('Printings fetch failed:', err)
+    }
+
+    if (printings.length === 0) {
+      // Fallback: at least show the card the user clicked.
+      printings = [card]
+    }
+
+    // Sort by price (cheapest first)
+    printings.sort((a, b) => getCardPrice(a) - getCardPrice(b))
+    setAllPrintings(printings)
+    setSelectedCard(printings[0])
+    setCardLoading(false)
   }
 
   async function handleLogout() {
@@ -641,22 +708,37 @@ function App() {
           <div className={theme.textSecondary}>Checking database...</div>
         )}
 
-        {!showPriceOracle && dbStatus === 'empty' && (
+        {/* Offline-mode-only welcome / download / error screens.
+            In online mode the search view renders immediately and any
+            background download surfaces as a smaller status pill below. */}
+        {!showPriceOracle && appMode === 'offline' && dbStatus === 'empty' && (
           <div className={`${theme.bgSecondary} rounded-lg p-6 mb-6`}>
             <h2 className="text-xl font-semibold mb-2">Welcome!</h2>
             <p className={`${theme.textSecondary} mb-4`}>
-              Download the card database to get started.
+              {isStandalonePWA()
+                ? 'Setting up offline mode — the card database is downloading.'
+                : 'Download the card database to use this app offline.'}
             </p>
-            <button
-              onClick={handleDownload}
-              className={`px-6 py-3 ${theme.accent} text-white rounded-lg font-medium`}
-            >
-              Download Card Database
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleDownload}
+                className={`px-6 py-3 ${theme.accent} text-white rounded-lg font-medium`}
+              >
+                Download Card Database
+              </button>
+              {!isStandalonePWA() && (
+                <button
+                  onClick={() => setAppMode('online')}
+                  className={`px-6 py-3 ${theme.bgTertiary} rounded-lg font-medium`}
+                >
+                  Use online instead
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {!showPriceOracle && dbStatus === 'downloading' && downloadProgress && (
+        {!showPriceOracle && appMode === 'offline' && dbStatus === 'downloading' && downloadProgress && (
           <div className={`${theme.bgSecondary} rounded-lg p-6 mb-6`}>
             <h2 className="text-xl font-semibold mb-2">Downloading...</h2>
             <p className={`${theme.textSecondary} mb-2`}>{downloadProgress.step}</p>
@@ -675,7 +757,7 @@ function App() {
           </div>
         )}
 
-        {!showPriceOracle && dbStatus === 'error' && (
+        {!showPriceOracle && appMode === 'offline' && dbStatus === 'error' && (
           <div className="bg-red-900 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-2">Download Failed</h2>
             <button
@@ -687,7 +769,7 @@ function App() {
           </div>
         )}
 
-        {!showPriceOracle && dbStatus === 'ready' && (
+        {!showPriceOracle && (appMode === 'online' || dbStatus === 'ready') && (
           <>
             <div className="mb-6">
               <SearchBar
@@ -696,19 +778,52 @@ function App() {
                 searchHistory={searchHistory}
                 onHistorySelect={rerunSearch}
                 initialQuery={lastQuery}
+                isSearching={isSearching}
+                useScryfallAutocomplete={appMode === 'online' || dbStatus !== 'ready'}
               />
               <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
-                <div className="flex items-center gap-3">
-                  <p className={`${theme.textSecondary} text-sm`}>
-                    {cardCount.toLocaleString()} cards in database
-                  </p>
-                  <button
-                    onClick={() => setShowSetsBrowser(true)}
-                    className={`px-3 py-1.5 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium hover:border-purple-500 transition-colors flex items-center gap-2`}
-                  >
-                    <span>📦</span>
-                    Browse Sets
-                  </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {appMode === 'online' ? (
+                    <>
+                      <span className={`px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1.5`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                        Live via Scryfall
+                      </span>
+                      {dbStatus === 'ready' ? (
+                        <button
+                          onClick={() => setAppMode('offline')}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium ${theme.bgTertiary} hover:opacity-80`}
+                          title={`${cardCount.toLocaleString()} cards cached locally`}
+                        >
+                          ✓ Offline ready — switch to offline
+                        </button>
+                      ) : dbStatus === 'downloading' && downloadProgress ? (
+                        <span className={`px-3 py-1 rounded-lg text-xs ${theme.bgTertiary}`}>
+                          Downloading offline DB… {downloadProgress.percent}%
+                        </span>
+                      ) : (
+                        <button
+                          onClick={handleDownload}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium ${theme.bgTertiary} hover:opacity-80 border ${theme.border}`}
+                        >
+                          ⬇ Download for offline use
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className={`${theme.textSecondary} text-sm`}>
+                        {cardCount.toLocaleString()} cards in database
+                      </p>
+                      <button
+                        onClick={() => setShowSetsBrowser(true)}
+                        className={`px-3 py-1.5 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium hover:border-purple-500 transition-colors flex items-center gap-2`}
+                      >
+                        <span>📦</span>
+                        Browse Sets
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -978,6 +1093,10 @@ function App() {
           onSync={handleSync}
           groupByName={groupByName}
           onGroupByNameChange={setGroupByName}
+          appMode={appMode}
+          onAppModeChange={setAppMode}
+          dbStatus={dbStatus}
+          onDownload={handleDownload}
         />
       )}
 

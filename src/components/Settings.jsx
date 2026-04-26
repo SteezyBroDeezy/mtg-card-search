@@ -1,6 +1,6 @@
 import { themes, saveTheme } from '../lib/theme'
 
-function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange }) {
+function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange, appMode, onAppModeChange, dbStatus, onDownload }) {
   function handleThemeClick(themeName) {
     saveTheme(themeName)
     onThemeChange(themeName)
@@ -93,21 +93,56 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
           ))}
         </div>
 
+        {/* Search Mode */}
+        {onAppModeChange && (
+          <div className={`border-t ${theme.border} pt-4`}>
+            <h3 className={`font-medium mb-3 ${theme.text}`}>Search Mode</h3>
+
+            <label className={`flex items-center justify-between p-3 ${theme.bgTertiary} rounded-lg cursor-pointer`}>
+              <div className="pr-3">
+                <p className={theme.text}>Use online mode</p>
+                <p className={`${theme.textSecondary} text-sm`}>
+                  Query Scryfall live instead of using the local database. No download needed.
+                </p>
+              </div>
+              <div className="relative flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={appMode === 'online'}
+                  onChange={(e) => onAppModeChange(e.target.checked ? 'online' : 'offline')}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </div>
+            </label>
+
+            <p className={`${theme.textSecondary} text-xs mt-2 px-1`}>
+              {appMode === 'online'
+                ? 'Currently online: searches use the Scryfall API. Browse Sets is unavailable in this mode.'
+                : 'Currently offline: searches use the locally downloaded card database.'}
+            </p>
+          </div>
+        )}
+
         {/* Database */}
-        <div className={`border-t ${theme.border} pt-4`}>
+        <div className={`border-t ${theme.border} pt-4 mt-4`}>
           <h3 className={`font-medium mb-3 ${theme.text}`}>Database</h3>
           <p className={`${theme.textSecondary} text-sm mb-1`}>
-            {cardCount.toLocaleString()} cards stored locally
+            {dbStatus === 'ready'
+              ? `${cardCount.toLocaleString()} cards stored locally`
+              : 'No local database — running in online mode'}
           </p>
           <p className={`${theme.textSecondary} text-xs mb-3`}>
-            Re-sync to get the latest cards and prices from Scryfall
+            {dbStatus === 'ready'
+              ? 'Re-sync to get the latest cards and prices from Scryfall'
+              : 'Download the database to enable offline search'}
           </p>
 
           <button
             onClick={onSync}
             className={`w-full py-3 ${theme.accent} text-white rounded-lg font-medium`}
           >
-            Sync Card Database
+            {dbStatus === 'ready' ? 'Sync Card Database' : 'Download Card Database'}
           </button>
           <p className={`${theme.textSecondary} text-xs text-center mt-2`}>
             Downloads ~27,000 unique cards. Works on mobile!
