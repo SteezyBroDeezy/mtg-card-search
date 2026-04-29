@@ -8,7 +8,8 @@ import {
   FORMAT_OPTIONS,
   PROPERTY_OPTIONS
 } from '../lib/search'
-import { db } from '../lib/db'
+ import { db } from '../lib/db'
+  import { normalizeText } from '../lib/scryfall'
 
 function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false }) {
   const [query, setQuery] = useState(initialQuery)
@@ -83,23 +84,14 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     return `${days}d ago`
   }
 
-  // Normalize text for fuzzy matching (remove accents, apostrophes, etc.)
-  function normalizeText(text) {
-    return text
-      .normalize('NFD') // Decompose accented characters
-      .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
-      .replace(/[''`]/g, '') // Remove apostrophes
-      .replace(/[æ]/gi, 'ae')
-      .replace(/[œ]/gi, 'oe')
-      .toLowerCase()
-  }
+// In-memory cache of recent suggestion lookups (survives re-renders)
+  const suggestionCacheRef = useRef(new Map())
 
   // Fetch card name suggestions
   useEffect(() => {
     let cancelled = false
 
     const fetchSuggestions = async () => {
-      // Only suggest if typing a plain name (no filter syntax)
       const trimmed = query.trim()
       if (!trimmed || trimmed.includes(':') || trimmed.includes('=') || trimmed.length < 2) {
         setSuggestions([])
@@ -107,7 +99,25 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         return
       }
 
-      // Online mode: use Scryfall's autocomplete endpoint (returns just names).
+      // Cache hit — instant return
+      const cacheKey = (useScryfallAutocomplete ? 'sf:' : 'lo:') + trimmed.toLowerCase()
+      const cached = suggestionCacheRef.current.get(cacheKey)
+      if (cached) {
+        setSuggestions(cached)
+        setShowSuggestions(cached.length > 0)
+        setSelectedSuggestionIndex(-1)
+        return
+      }
+
+      const writeCache = (out) => {
+        suggestionCacheRef.current.set(cacheKey, out)
+        if (suggestionCacheRef.current.size > 200) {
+          const firstKey = suggestionCacheRef.current.keys().next().value
+          suggestionCacheRef.current.delete(firstKey)
+        }
+      }
+
+      // Online mode: Scryfall autocomplete API
       if (useScryfallAutocomplete) {
         try {
           const res = await fetch(
@@ -116,12 +126,13 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           const data = await res.json()
           if (cancelled) return
           const names = Array.isArray(data?.data) ? data.data : []
-          const suggestions = names.slice(0, 12).map(name => ({
+          const out = names.slice(0, 12).map(name => ({
             displayName: name,
             searchName: name
           }))
-          setSuggestions(suggestions)
-          setShowSuggestions(suggestions.length > 0)
+          writeCache(out)
+          setSuggestions(out)
+          setShowSuggestions(out.length > 0)
           setSelectedSuggestionIndex(-1)
         } catch (err) {
           if (cancelled) return
@@ -131,56 +142,45 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         return
       }
 
+      // Offline mode: indexed lookups against local Dexie DB. No table scans.
       try {
         const normalizedQuery = normalizeText(trimmed)
-        const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
 
-        // Run multiple searches in parallel for better results
-        const [startsWithResults, containsResults, flavorNameResults] = await Promise.all([
-          // Exact prefix match on name (fast, indexed)
+        const [nameMatches, wordMatches, flavorMatches] = await Promise.all([
           db.cards
-            .where('name')
-            .startsWithIgnoreCase(trimmed)
+            .where('name_normalized')
+            .startsWith(normalizedQuery)
             .limit(15)
             .toArray(),
-          // Contains search - matches any word in the name
           db.cards
-            .filter(card => {
-              const normalizedName = normalizeText(card.name)
-              // Check if ALL query words appear somewhere in the name
-              return queryWords.every(word => normalizedName.includes(word))
-            })
+            .where('name_words')
+            .startsWith(normalizedQuery)
             .limit(30)
             .toArray(),
-          // Search flavor_name for Secret Lair / Universe Beyond cards
           db.cards
-            .where('flavor_name')
-            .startsWithIgnoreCase(trimmed)
-            .limit(15)
+            .where('flavor_name_normalized')
+            .startsWith(normalizedQuery)
+            .limit(10)
             .toArray()
         ])
 
-        // Drop results from a stale query — if the user typed more letters
-        // while we were waiting, the newer query's results must win.
         if (cancelled) return
 
-        // Combine and deduplicate, prioritizing startsWith matches
-        const seenNames = new Set()
+        const seen = new Set()
         const combined = []
 
-        // Add startsWith matches first (higher priority)
-        for (const card of startsWithResults) {
-          if (!seenNames.has(card.name)) {
-            seenNames.add(card.name)
+        // Priority 1: name starts with query
+        for (const card of nameMatches) {
+          if (!seen.has(card.name)) {
+            seen.add(card.name)
             combined.push({ name: card.name, displayName: card.name, priority: 1 })
           }
         }
 
-        // Add flavor_name matches (Secret Lair alternate names like "Heralds of the Shredder")
-        for (const card of flavorNameResults) {
-          if (!seenNames.has(card.name) && card.flavor_name) {
-            seenNames.add(card.name)
-            // Show flavor name with real name in parentheses
+        // Priority 1.5: flavor_name starts with query
+        for (const card of flavorMatches) {
+          if (!seen.has(card.name) && card.flavor_name) {
+            seen.add(card.name)
             combined.push({
               name: card.name,
               displayName: `${card.flavor_name} (${card.name})`,
@@ -189,48 +189,27 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           }
         }
 
-        // Add contains matches (these include reprints and partial matches)
-        for (const card of containsResults) {
-          if (!seenNames.has(card.name)) {
-            seenNames.add(card.name)
-            // Higher priority if query appears as a word boundary (not mid-word)
-            const nameLower = card.name.toLowerCase()
-            const queryLower = trimmed.toLowerCase()
-            const wordBoundary = nameLower.includes(' ' + queryLower) ||
-                                 nameLower.includes(queryLower + ' ') ||
-                                 nameLower.startsWith(queryLower)
-            combined.push({ name: card.name, displayName: card.name, priority: wordBoundary ? 2 : 3 })
+        // Priority 2: any word in name starts with query
+        for (const card of wordMatches) {
+          if (!seen.has(card.name)) {
+            seen.add(card.name)
+            combined.push({ name: card.name, displayName: card.name, priority: 2 })
           }
         }
 
-        // Also search flavor_name with contains
-        for (const card of [...startsWithResults, ...containsResults]) {
-          if (card.flavor_name && !seenNames.has(card.name)) {
-            const normalizedFlavor = normalizeText(card.flavor_name)
-            if (queryWords.every(word => normalizedFlavor.includes(word))) {
-              seenNames.add(card.name)
-              combined.push({
-                name: card.name,
-                displayName: `${card.flavor_name} (${card.name})`,
-                priority: 2
-              })
-            }
-          }
-        }
-
-        // Sort by priority, then alphabetically
         combined.sort((a, b) => {
           if (a.priority !== b.priority) return a.priority - b.priority
           return a.displayName.localeCompare(b.displayName)
         })
 
-        // Get top 12 suggestions - use displayName for showing, name for search
-        const suggestions = combined.slice(0, 12).map(c => ({
+        const out = combined.slice(0, 12).map(c => ({
           displayName: c.displayName,
           searchName: c.name
         }))
-        setSuggestions(suggestions)
-        setShowSuggestions(suggestions.length > 0)
+
+        writeCache(out)
+        setSuggestions(out)
+        setShowSuggestions(out.length > 0)
         setSelectedSuggestionIndex(-1)
       } catch (err) {
         if (cancelled) return
@@ -239,7 +218,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
       }
     }
 
-    const debounce = setTimeout(fetchSuggestions, 150)
+    const debounce = setTimeout(fetchSuggestions, 120)
     return () => {
       cancelled = true
       clearTimeout(debounce)
