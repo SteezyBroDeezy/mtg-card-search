@@ -234,7 +234,20 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     onSearch(searchName)
   }
 
-  function handleKeyDown(e) {
+function handleKeyDown(e) {
+    // Esc: hide suggestions if open, otherwise clear the input
+    if (e.key === 'Escape') {
+      if (showSuggestions) {
+        setShowSuggestions(false)
+      } else if (query) {
+        e.preventDefault()
+        setQuery('')
+        setSuggestions([])
+        inputRef.current?.focus()
+      }
+      return
+    }
+
     if (!showSuggestions || suggestions.length === 0) return
 
     if (e.key === 'ArrowDown') {
@@ -249,10 +262,8 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
       e.preventDefault()
       const suggestion = suggestions[selectedSuggestionIndex]
       handleSuggestionClick(suggestion)
-    } else if (e.key === 'Escape') {
-      setShowSuggestions(false)
     }
-  }
+  
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -545,10 +556,10 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                 setShowSuggestions(false)
                 inputRef.current?.focus()
               }}
-              className={`absolute right-20 top-1/2 -translate-y-1/2 p-1.5 ${theme.textSecondary} hover:text-white rounded-full hover:bg-gray-600 transition-colors`}
-              title="Clear search"
+              className={`absolute right-20 top-1/2 -translate-y-1/2 p-2 ${theme.textSecondary} hover:text-white rounded-full hover:bg-gray-600 transition-colors`}
+              title="Clear search (Esc)"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
