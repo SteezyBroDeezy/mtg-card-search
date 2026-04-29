@@ -234,7 +234,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     onSearch(searchName)
   }
 
-function handleKeyDown(e) {
+  function handleKeyDown(e) {
     // Esc: hide suggestions if open, otherwise clear the input
     if (e.key === 'Escape') {
       if (showSuggestions) {
@@ -263,7 +263,7 @@ function handleKeyDown(e) {
       const suggestion = suggestions[selectedSuggestionIndex]
       handleSuggestionClick(suggestion)
     }
-  
+  }
 
   function handleSubmit(e) {
     e.preventDefault()
