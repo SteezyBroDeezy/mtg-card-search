@@ -9,7 +9,7 @@ import { defineConfig } from 'vite'
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         includeAssets: ['favicon.ico'],
         manifest: {
           name: 'MTG Card Search',
@@ -32,6 +32,8 @@ import { defineConfig } from 'vite'
           ]
         },
         workbox: {
+          skipWaiting: true,
+          clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           runtimeCaching: [
             {
