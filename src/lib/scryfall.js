@@ -2,6 +2,19 @@ import { db } from './db'
 
 const SCRYFALL_API = 'https://api.scryfall.com'
 
+  // Normalize text for indexed suggestion lookup.
+  // Keep this in sync with the normalize used in SearchBar.jsx.
+  export function normalizeText(text) {
+    if (!text) return ''
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[''`]/g, '')
+      .replace(/[æ]/gi, 'ae')
+      .replace(/[œ]/gi, 'oe')
+      .toLowerCase()
+  }
+
 // Process a raw card from Scryfall into our compact format
 function processCard(card) {
   const hasMultipleFaces = card.card_faces && card.card_faces.length > 1
@@ -9,7 +22,10 @@ function processCard(card) {
   let cardData = {
     id: card.id,
     name: card.name,
-    flavor_name: card.flavor_name || '', // Secret Lair / Universe Beyond alternate names
+flavor_name: card.flavor_name || '', // Secret Lair / Universe Beyond alternate names
+  name_normalized: normalizeText(card.name),
+  name_words: normalizeText(card.name).split(/\s+/).filter(Boolean),
+  flavor_name_normalized: normalizeText(card.flavor_name || ''),
     type_line: card.type_line || '',
     mana_cost: card.mana_cost || '',
     cmc: card.cmc || 0,
