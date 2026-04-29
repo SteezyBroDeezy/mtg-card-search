@@ -117,7 +117,8 @@ export async function downloadCards(onProgress) {
   let nextUrl = `${SCRYFALL_API}/cards/search?q=game%3Apaper&unique=cards&order=name`
   let totalSaved = 0
   let pageNum = 0
-  const estimatedTotal = 27000 // Approximate unique cards
+  // Initial estimate; refined from data.total_cards on the first response
+  let estimatedTotal = 32000
 
   while (nextUrl) {
     pageNum++
@@ -146,6 +147,11 @@ export async function downloadCards(onProgress) {
       }
 
       const data = await response.json()
+
+      // Use the real total from Scryfall once we know it
+      if (typeof data.total_cards === 'number' && data.total_cards > 0) {
+        estimatedTotal = data.total_cards
+      }
 
       if (data.data && data.data.length > 0) {
         // Process and save this batch
