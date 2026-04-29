@@ -3,18 +3,16 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
- // Version 6 - Added normalized name fields for fast indexed suggestion lookup
-  db.version(6).stores({
-    cards: 'id, name, name_normalized, *name_words, flavor_name, flavor_name_normalized, type_line, mana_cost,
-  cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank,
-  released_at',
-    meta: 'key',
-    lists: 'id, name, createdAt, updatedAt, synced',
-    listCards: '[listId+cardId], listId, cardId, addedAt, synced'
-  }).upgrade(tx => {
-    // Clear cards to force re-download with normalized fields populated
-    return tx.table('cards').clear()
-  })
+// Version 6 - Added normalized name fields for fast indexed suggestion lookup
+db.version(6).stores({
+  cards: 'id, name, name_normalized, *name_words, flavor_name, flavor_name_normalized, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
+  meta: 'key',
+  lists: 'id, name, createdAt, updatedAt, synced',
+  listCards: '[listId+cardId], listId, cardId, addedAt, synced'
+}).upgrade(tx => {
+  // Clear cards to force re-download with normalized fields populated
+  return tx.table('cards').clear()
+})
 
 // Version 5 - Added flavor_name for Secret Lair / Universe Beyond alternate names
 db.version(5).stores({
