@@ -11,7 +11,7 @@ import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db } from './lib/db'
-import { downloadCards } from './lib/scryfall'
+import { downloadCards, syncNewCards } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
@@ -265,7 +265,20 @@ function App() {
 
   async function handleSync() {
     setShowSettings(false)
-    await handleDownload()
+    // Incremental sync: only fetches cards released since last sync.
+    // Falls back to a full download if there's no prior sync state.
+    setDbStatus('downloading')
+    try {
+      const count = await syncNewCards((progress) => {
+        setDownloadProgress(progress)
+      })
+      setCardCount(count)
+      setDbStatus('ready')
+      setDownloadProgress(null)
+    } catch (error) {
+      console.error('Sync failed:', error)
+      setDbStatus('error')
+    }
   }
 
   // Helper to get best price from a card

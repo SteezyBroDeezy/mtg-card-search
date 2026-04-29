@@ -119,6 +119,8 @@ export async function downloadCards(onProgress) {
   let pageNum = 0
   // Initial estimate; refined from data.total_cards on the first response
   let estimatedTotal = 32000
+  // Track the latest release date seen so future syncs can be incremental
+  let latestRelease = ''
 
   while (nextUrl) {
     pageNum++
@@ -160,6 +162,11 @@ export async function downloadCards(onProgress) {
         if (cards.length > 0) {
           await db.cards.bulkAdd(cards)
           totalSaved += cards.length
+          for (const c of cards) {
+            if (c.released_at && c.released_at > latestRelease) {
+              latestRelease = c.released_at
+            }
+          }
         }
       }
 
@@ -180,6 +187,9 @@ export async function downloadCards(onProgress) {
   }
 
   await db.meta.put({ key: 'lastSync', value: new Date().toISOString() })
+  if (latestRelease) {
+    await db.meta.put({ key: 'lastReleaseSeen', value: latestRelease })
+  }
 
   const totalTime = ((Date.now() - startTime) / 1000 / 60).toFixed(1)
   onProgress?.({
@@ -189,4 +199,109 @@ export async function downloadCards(onProgress) {
   })
 
   return totalSaved
+}
+
+// Incremental sync: only fetch cards released since last sync.
+// Falls back to a full downloadCards() if there's no prior sync to compare against.
+export async function syncNewCards(onProgress) {
+  const lastReleaseMeta = await db.meta.get('lastReleaseSeen')
+  const cardCount = await db.cards.count()
+
+  // No prior sync OR DB was wiped — do a full download instead.
+  if (!lastReleaseMeta?.value || cardCount === 0) {
+    return await downloadCards(onProgress)
+  }
+
+  const startTime = Date.now()
+
+  // 30-day overlap window catches errata / late-added reprints we may have missed.
+  const lastDate = new Date(lastReleaseMeta.value)
+  const overlapMs = 30 * 24 * 60 * 60 * 1000
+  const sinceDate = new Date(lastDate.getTime() - overlapMs)
+  const sinceStr = sinceDate.toISOString().slice(0, 10)
+
+  onProgress?.({
+    step: 'Checking for new cards...',
+    percent: 0,
+    detail: `Looking for cards since ${sinceStr}`
+  })
+
+  const query = `game:paper date>=${sinceStr}`
+  let nextUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
+  let totalUpdated = 0
+  let pageNum = 0
+  let estimatedTotal = 500
+  let latestRelease = lastReleaseMeta.value
+
+  while (nextUrl) {
+    pageNum++
+
+    onProgress?.({
+      step: `Syncing new cards (page ${pageNum})...`,
+      percent: Math.min(95, Math.floor((totalUpdated / Math.max(estimatedTotal, 1)) * 95)),
+      detail: `${totalUpdated.toLocaleString()} cards updated`
+    })
+
+    try {
+      const response = await fetch(nextUrl)
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Scryfall returns 404 when no cards match — already up to date.
+          nextUrl = null
+          break
+        }
+        if (response.status === 429) {
+          await delay(1000)
+          continue
+        }
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (typeof data.total_cards === 'number' && data.total_cards > 0) {
+        estimatedTotal = data.total_cards
+      }
+
+      if (data.data && data.data.length > 0) {
+        const cards = data.data.map(processCard).filter(Boolean)
+        if (cards.length > 0) {
+          // bulkPut upserts — overwrites any existing rows with same id (errata, etc).
+          await db.cards.bulkPut(cards)
+          totalUpdated += cards.length
+          for (const c of cards) {
+            if (c.released_at && c.released_at > latestRelease) {
+              latestRelease = c.released_at
+            }
+          }
+        }
+      }
+
+      if (data.has_more && data.next_page) {
+        nextUrl = data.next_page
+        await delay(100)
+      } else {
+        nextUrl = null
+      }
+    } catch (error) {
+      console.error('Sync fetch error:', error)
+      await delay(500)
+    }
+  }
+
+  await db.meta.put({ key: 'lastSync', value: new Date().toISOString() })
+  await db.meta.put({ key: 'lastReleaseSeen', value: latestRelease })
+
+  const totalSeconds = ((Date.now() - startTime) / 1000).toFixed(1)
+  onProgress?.({
+    step: 'Done!',
+    percent: 100,
+    detail: totalUpdated > 0
+      ? `${totalUpdated.toLocaleString()} card${totalUpdated === 1 ? '' : 's'} updated in ${totalSeconds}s`
+      : `Already up to date (checked in ${totalSeconds}s)`
+  })
+
+  // Return the new total card count so callers can update UI state.
+  return await db.cards.count()
 }
