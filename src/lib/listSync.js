@@ -100,6 +100,110 @@ export async function removeCardFromListLocal(listId, cardId) {
   }
 }
 
+// Merge sourceList into targetList. Cards already in target are kept (no duplicates).
+// Optionally renames the target. If userId is provided and the lists are already
+// in Firebase, propagates the changes immediately so a stray sync won't pull the
+// deleted source back. Falls back to local-only merge when offline.
+export async function mergeListsLocal({ targetListId, sourceListId, newName, userId }) {
+  if (!targetListId || !sourceListId) {
+    throw new Error('Both target and source list IDs are required')
+  }
+  if (targetListId === sourceListId) {
+    throw new Error('Cannot merge a list with itself')
+  }
+
+  const target = await db.lists.get(targetListId)
+  const source = await db.lists.get(sourceListId)
+  if (!target) throw new Error('Target list not found')
+  if (!source) throw new Error('Source list not found')
+
+  const [sourceCards, targetCards] = await Promise.all([
+    db.listCards.where('listId').equals(sourceListId).toArray(),
+    db.listCards.where('listId').equals(targetListId).toArray()
+  ])
+  const targetCardIds = new Set(targetCards.map(c => c.cardId))
+
+  // Cards to actually move (not already present in target)
+  const cardsToMove = sourceCards.filter(c => !targetCardIds.has(c.cardId))
+
+  // Insert into target locally
+  for (const card of cardsToMove) {
+    await db.listCards.put({
+      listId: targetListId,
+      cardId: card.cardId,
+      name: card.name,
+      image_small: card.image_small,
+      image_normal: card.image_normal,
+      note: card.note || '',
+      addedAt: card.addedAt || new Date().toISOString(),
+      synced: false
+    })
+  }
+
+  const finalName = (newName ?? target.name).trim() || target.name
+  const newCardCount = targetCards.length + cardsToMove.length
+
+  await db.lists.update(targetListId, {
+    name: finalName,
+    cardCount: newCardCount,
+    updatedAt: new Date().toISOString(),
+    synced: false
+  })
+
+  // Drop source locally
+  await db.listCards.where('listId').equals(sourceListId).delete()
+  await db.lists.delete(sourceListId)
+
+  // Propagate to Firebase if we can. Failures here are non-fatal — local state
+  // is correct and a future sync will catch up (once the existing sync logic
+  // handles deletions, which it doesn't today; that's why we do it inline here).
+  if (userId) {
+    try {
+      const targetIsRemote = !targetListId.startsWith('local_')
+      const sourceIsRemote = !sourceListId.startsWith('local_')
+
+      if (targetIsRemote) {
+        const targetRef = doc(firestore, 'users', userId, 'lists', targetListId)
+        await setDoc(targetRef, {
+          name: finalName,
+          createdAt: target.createdAt,
+          cardCount: newCardCount
+        }, { merge: true })
+
+        for (const card of cardsToMove) {
+          const cardRef = doc(firestore, 'users', userId, 'lists', targetListId, 'cards', card.cardId)
+          await setDoc(cardRef, {
+            cardId: card.cardId,
+            name: card.name,
+            image_small: card.image_small || '',
+            image_normal: card.image_normal || '',
+            note: card.note || '',
+            addedAt: card.addedAt || new Date().toISOString()
+          })
+          await db.listCards.update([targetListId, card.cardId], { synced: true })
+        }
+        await db.lists.update(targetListId, { synced: true })
+      }
+
+      if (sourceIsRemote) {
+        // Delete the source list's card subcollection, then the list doc itself.
+        const sourceCardsRef = collection(firestore, 'users', userId, 'lists', sourceListId, 'cards')
+        const cardsSnapshot = await getDocs(sourceCardsRef)
+        for (const cardDoc of cardsSnapshot.docs) {
+          await deleteDoc(cardDoc.ref)
+        }
+        await firebaseDeleteList(userId, sourceListId)
+      }
+
+      await db.meta.put({ key: 'lastListSync', value: new Date().toISOString() })
+    } catch (err) {
+      console.error('Firebase merge propagation failed (local merge already saved):', err)
+    }
+  }
+
+  return await db.lists.get(targetListId)
+}
+
 // Sync lists with Firebase
 export async function syncLists(userId) {
   if (!userId) return { success: false, error: 'Not logged in' }

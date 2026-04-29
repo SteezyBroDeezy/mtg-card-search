@@ -7,7 +7,8 @@ import {
   removeCardFromListLocal,
   syncLists,
   getLastSyncTime,
-  hasUnsyncedChanges
+  hasUnsyncedChanges,
+  mergeListsLocal
 } from '../lib/listSync'
 
 function MyLists({ userId, onClose }) {
@@ -24,6 +25,12 @@ function MyLists({ userId, onClose }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null) // list to confirm deletion
   const [selectMode, setSelectMode] = useState(false)
   const [selectedCards, setSelectedCards] = useState(new Set())
+  // Merge dialog: source list to merge into another, target choice, name choice
+  const [mergeSource, setMergeSource] = useState(null)
+  const [mergeTargetId, setMergeTargetId] = useState('')
+  const [mergeNameMode, setMergeNameMode] = useState('target') // 'target' | 'source' | 'custom'
+  const [mergeCustomName, setMergeCustomName] = useState('')
+  const [merging, setMerging] = useState(false)
 
   useEffect(() => {
     loadLists()
@@ -94,6 +101,54 @@ function MyLists({ userId, onClose }) {
 
   function handleDeleteList(list) {
     setDeleteConfirm(list)
+  }
+
+  function handleOpenMerge(list) {
+    setMergeSource(list)
+    setMergeTargetId('')
+    setMergeNameMode('target')
+    setMergeCustomName('')
+  }
+
+  function closeMergeDialog() {
+    setMergeSource(null)
+    setMergeTargetId('')
+    setMergeNameMode('target')
+    setMergeCustomName('')
+  }
+
+  async function confirmMerge() {
+    if (!mergeSource || !mergeTargetId) return
+    const target = lists.find(l => l.id === mergeTargetId)
+    if (!target) return
+
+    let newName
+    if (mergeNameMode === 'source') newName = mergeSource.name
+    else if (mergeNameMode === 'custom') newName = mergeCustomName.trim() || target.name
+    else newName = target.name
+
+    setMerging(true)
+    try {
+      await mergeListsLocal({
+        targetListId: target.id,
+        sourceListId: mergeSource.id,
+        newName,
+        userId
+      })
+      await loadLists()
+      await loadSyncStatus()
+      // If user was viewing the source list, drop them back to the lists view.
+      if (selectedList?.id === mergeSource.id) {
+        setSelectedList(null)
+        setCards([])
+      }
+      closeMergeDialog()
+    } catch (err) {
+      console.error('Failed to merge lists:', err)
+      alert('Merge failed: ' + err.message)
+    } finally {
+      setMerging(false)
+    }
   }
 
   async function confirmDeleteList() {
@@ -370,15 +425,29 @@ function MyLists({ userId, onClose }) {
                           </span>
                         )}
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteList(list)
-                        }}
-                        className="text-red-400 hover:text-red-300 px-2"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {lists.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenMerge(list)
+                            }}
+                            className="text-blue-400 hover:text-blue-300 px-2 text-sm"
+                            title="Merge this list into another"
+                          >
+                            Merge
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteList(list)
+                          }}
+                          className="text-red-400 hover:text-red-300 px-2"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -399,6 +468,117 @@ function MyLists({ userId, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Merge Dialog */}
+      {mergeSource && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[60]"
+          onClick={() => !merging && closeMergeDialog()}
+        >
+          <div
+            className="bg-gray-800 rounded-xl p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-white mb-1">Merge list</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Move all cards from
+              <span className="text-white font-medium"> "{mergeSource.name}" </span>
+              ({mergeSource.cardCount || 0} cards) into another list.
+              Duplicates are skipped automatically.
+            </p>
+
+            <label className="block text-gray-300 text-sm mb-1">Merge into</label>
+            <select
+              value={mergeTargetId}
+              onChange={(e) => {
+                setMergeTargetId(e.target.value)
+                setMergeNameMode('target')
+              }}
+              className="w-full mb-4 px-3 py-2 bg-gray-700 rounded-lg text-white"
+            >
+              <option value="">Select a list...</option>
+              {lists
+                .filter(l => l.id !== mergeSource.id)
+                .map(l => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} ({l.cardCount || 0} cards)
+                  </option>
+                ))}
+            </select>
+
+            {mergeTargetId && (
+              <>
+                <label className="block text-gray-300 text-sm mb-2">Final list name</label>
+                <div className="space-y-2 mb-4 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeName"
+                      value="target"
+                      checked={mergeNameMode === 'target'}
+                      onChange={() => setMergeNameMode('target')}
+                    />
+                    <span className="text-white">
+                      Keep target name:
+                      <span className="text-gray-300"> "{lists.find(l => l.id === mergeTargetId)?.name}"</span>
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeName"
+                      value="source"
+                      checked={mergeNameMode === 'source'}
+                      onChange={() => setMergeNameMode('source')}
+                    />
+                    <span className="text-white">
+                      Use source name:
+                      <span className="text-gray-300"> "{mergeSource.name}"</span>
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mergeName"
+                      value="custom"
+                      checked={mergeNameMode === 'custom'}
+                      onChange={() => setMergeNameMode('custom')}
+                    />
+                    <span className="text-white">Custom name</span>
+                  </label>
+                  {mergeNameMode === 'custom' && (
+                    <input
+                      type="text"
+                      value={mergeCustomName}
+                      onChange={(e) => setMergeCustomName(e.target.value)}
+                      placeholder="New list name..."
+                      className="w-full mt-1 ml-6 px-3 py-2 bg-gray-700 rounded-lg text-white"
+                      autoFocus
+                    />
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3 justify-end mt-2">
+              <button
+                onClick={closeMergeDialog}
+                disabled={merging}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-medium disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMerge}
+                disabled={merging || !mergeTargetId || (mergeNameMode === 'custom' && !mergeCustomName.trim())}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {merging ? 'Merging...' : 'Merge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
