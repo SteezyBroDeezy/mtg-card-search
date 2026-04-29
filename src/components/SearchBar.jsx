@@ -84,12 +84,21 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     return `${days}d ago`
   }
 
-// In-memory cache of recent suggestion lookups (survives re-renders)
+  // In-memory cache of recent suggestion lookups (survives re-renders)
   const suggestionCacheRef = useRef(new Map())
+  // One-shot flag set when a suggestion was just clicked, so the
+  // query-change effect below doesn't immediately re-open the dropdown
+  // for the card name we just chose.
+  const skipNextSuggestRef = useRef(false)
 
   // Fetch card name suggestions
   useEffect(() => {
     let cancelled = false
+
+    if (skipNextSuggestRef.current) {
+      skipNextSuggestRef.current = false
+      return
+    }
 
     const fetchSuggestions = async () => {
       const trimmed = query.trim()
@@ -229,9 +238,17 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     // suggestion can be object {displayName, searchName} or string (for backwards compatibility)
     const searchName = typeof suggestion === 'object' ? suggestion.searchName : suggestion
     const displayName = typeof suggestion === 'object' ? suggestion.displayName : suggestion
+    // Setting query to the picked name would otherwise re-trigger the
+    // suggestion fetcher and pop the dropdown right back open. Skip the
+    // next run.
+    skipNextSuggestRef.current = true
     setQuery(displayName)
+    setSuggestions([])
     setShowSuggestions(false)
+    setSelectedSuggestionIndex(-1)
     onSearch(searchName)
+    // Drop focus from the input so the mobile keyboard doesn't pop back up.
+    inputRef.current?.blur()
   }
 
   function handleKeyDown(e) {
