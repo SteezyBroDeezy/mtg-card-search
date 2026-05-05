@@ -120,7 +120,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/90 flex items-start justify-center p-2 sm:p-4 z-50 overflow-y-auto"
+        className="fixed inset-0 bg-black/90 flex items-start justify-center p-2 sm:p-4 z-[70] overflow-y-auto"
         onClick={onClose}
       >
         <div

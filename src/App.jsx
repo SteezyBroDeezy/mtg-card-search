@@ -1099,7 +1099,7 @@ function App() {
       )}
 
       {cardLoading && !selectedCard && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center">
           <div className={`${theme.bgSecondary} rounded-xl p-8 text-center shadow-2xl`}>
             <div className="text-5xl animate-bounce mb-4">🧙</div>
             <p className={`${theme.textSecondary}`}>Summoning card details...</p>
