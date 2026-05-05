@@ -15,9 +15,18 @@ function generateLocalId() {
   return 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
 }
 
-// Get all lists (local first, with sync status)
+// Get all lists (local first, with sync status).
+// Sorted most-recently-used first so the list a user just touched shows
+// up at the top of pickers like SaveToListModal. addCardToListLocal,
+// removeCardFromListLocal, mergeListsLocal, and createListLocal all bump
+// updatedAt, so this stays current automatically.
 export async function getLocalLists() {
-  return await db.lists.toArray()
+  const lists = await db.lists.toArray()
+  return lists.sort((a, b) => {
+    const aTime = a.updatedAt || a.createdAt || ''
+    const bTime = b.updatedAt || b.createdAt || ''
+    return bTime.localeCompare(aTime)
+  })
 }
 
 // Create a list locally

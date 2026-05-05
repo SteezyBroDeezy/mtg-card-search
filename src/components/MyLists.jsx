@@ -11,7 +11,7 @@ import {
   mergeListsLocal
 } from '../lib/listSync'
 
-function MyLists({ userId, onClose }) {
+function MyLists({ userId, onClose, onCardClick }) {
   const [lists, setLists] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedList, setSelectedList] = useState(null)
@@ -322,7 +322,13 @@ function MyLists({ userId, onClose }) {
                     <div
                       key={card.cardId}
                       className={`relative group cursor-pointer ${selectMode && selectedCards.has(card.cardId) ? 'ring-2 ring-purple-500 rounded-lg' : ''}`}
-                      onClick={() => selectMode && toggleCardSelection(card.cardId)}
+                      onClick={() => {
+                        if (selectMode) {
+                          toggleCardSelection(card.cardId)
+                        } else if (onCardClick) {
+                          onCardClick(card)
+                        }
+                      }}
                     >
                       {selectMode && (
                         <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center ${

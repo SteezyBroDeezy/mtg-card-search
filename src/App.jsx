@@ -563,6 +563,39 @@ function App() {
     setCardLoading(false)
   }
 
+  // Cards stored on lists carry only minimal fields (id, name, images, note).
+  // To open the same CardDetail modal that search results use, hydrate to a
+  // full Scryfall record first — local DB if it has it, otherwise the API.
+  async function handleListCardClick(listCard) {
+    if (!listCard?.cardId) return
+    setCardLoading(true)
+    let fullCard = null
+    try {
+      fullCard = await db.cards.get(listCard.cardId)
+      if (!fullCard) {
+        const res = await fetch(`https://api.scryfall.com/cards/${listCard.cardId}`)
+        if (res.ok) {
+          const c = await res.json()
+          fullCard = {
+            ...c,
+            image_small: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small,
+            image_normal: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
+            image_large: c.image_uris?.large || c.card_faces?.[0]?.image_uris?.large,
+            image_art_crop: c.image_uris?.art_crop || c.card_faces?.[0]?.image_uris?.art_crop
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to hydrate list card:', err)
+    }
+    if (!fullCard) {
+      setCardLoading(false)
+      alert('Could not load card details. You may be offline.')
+      return
+    }
+    await handleViewFullDetails(fullCard)
+  }
+
   async function handleLogout() {
     await logOut()
   }
@@ -1094,7 +1127,11 @@ function App() {
       )}
 
       {showLists && user && (
-        <MyLists userId={user.uid} onClose={() => { setShowLists(false); checkSyncStatus(); }} />
+        <MyLists
+          userId={user.uid}
+          onClose={() => { setShowLists(false); checkSyncStatus(); }}
+          onCardClick={handleListCardClick}
+        />
       )}
 
       {showSettings && (
