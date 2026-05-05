@@ -75,7 +75,7 @@ function SaveToListModal({ card, userId, onClose, theme }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-[60]"
+      className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-[80]"
       onClick={onClose}
     >
       {/* Mobile: Bottom sheet | Desktop: Centered modal */}
