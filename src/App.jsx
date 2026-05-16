@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import SearchBar from './components/SearchBar'
 import CardDetail from './components/CardDetail'
 import QuickCardView from './components/QuickCardView'
@@ -44,7 +44,6 @@ function App() {
     if (saved === 'online' || saved === 'offline') return saved
     return isStandalonePWA() ? 'offline' : 'online'
   })
-  const [searchResults, setSearchResults] = useState([])
   const [allResults, setAllResults] = useState([])
   const [displayCount, setDisplayCount] = useState(50)
   const [lastQuery, setLastQuery] = useState('')
@@ -78,6 +77,8 @@ function App() {
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
   const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
+  const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'rarity'
+  const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
 
   // PWA Update handling
   const {
@@ -104,6 +105,86 @@ function App() {
     const days = Math.floor(hours / 24)
     return `${days}d ago`
   }
+
+  // Result-list post-processing: sort + type filter applied after search.
+  // The query DSL filters happen earlier in handleSearch; these are display-time controls.
+  const processedResults = useMemo(() => {
+    if (allResults.length === 0) return allResults
+
+    const RARITY_RANK = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, bonus: 5 }
+    const cardPriceForSort = (card) => {
+      const raw = card.prices?.usd ?? card.prices?.usd_foil ?? card.prices?.eur
+      const n = raw == null ? NaN : parseFloat(raw)
+      return Number.isFinite(n) ? n : null
+    }
+    const cardHasType = (card, type) => {
+      const tl = (card.type_line || '').toLowerCase()
+      return tl.includes(type.toLowerCase())
+    }
+
+    let working = allResults
+    if (typeFilter.length > 0) {
+      working = working.filter(c => typeFilter.some(t => cardHasType(c, t)))
+    }
+
+    if (sortBy !== 'default') {
+      // Don't mutate the original array — handleSearch holds a reference.
+      working = working.slice()
+      if (sortBy === 'name-asc' || sortBy === 'name-desc') {
+        const dir = sortBy === 'name-asc' ? 1 : -1
+        working.sort((a, b) => dir * (a.name || '').localeCompare(b.name || ''))
+      } else if (sortBy === 'price-desc' || sortBy === 'price-asc') {
+        const dir = sortBy === 'price-desc' ? -1 : 1
+        working.sort((a, b) => {
+          const pa = cardPriceForSort(a)
+          const pb = cardPriceForSort(b)
+          // Cards without a price always sink to the end regardless of direction.
+          if (pa == null && pb == null) return 0
+          if (pa == null) return 1
+          if (pb == null) return -1
+          return dir * (pa - pb)
+        })
+      } else if (sortBy === 'rarity') {
+        working.sort((a, b) => {
+          const ra = RARITY_RANK[a.rarity] ?? 99
+          const rb = RARITY_RANK[b.rarity] ?? 99
+          return ra - rb
+        })
+      }
+    }
+
+    return working
+  }, [allResults, sortBy, typeFilter])
+
+  const displayedResults = useMemo(
+    () => processedResults.slice(0, displayCount),
+    [processedResults, displayCount]
+  )
+
+  // Reset to first page whenever sort/filter changes so the user sees the top
+  // of the newly-ordered list (not page N of a different ordering).
+  useEffect(() => {
+    setDisplayCount(50)
+  }, [sortBy, typeFilter])
+
+  function toggleTypeFilter(type) {
+    setTypeFilter(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
+  }
+
+  function resetResultFilters() {
+    setSortBy('default')
+    setTypeFilter([])
+  }
+
+  const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle']
+  const SORT_OPTIONS = [
+    { value: 'default', label: 'Default order' },
+    { value: 'name-asc', label: 'Name A → Z' },
+    { value: 'name-desc', label: 'Name Z → A' },
+    { value: 'price-desc', label: 'Price (high → low)' },
+    { value: 'price-asc', label: 'Price (low → high)' },
+    { value: 'rarity', label: 'Rarity (mythic → common)' },
+  ]
 
   useEffect(() => {
     checkDatabase()
@@ -382,7 +463,6 @@ function App() {
     }
 
     if (!query.trim()) {
-      setSearchResults([])
       setAllResults([])
       setDisplayCount(50)
       return
@@ -420,7 +500,6 @@ function App() {
           message: 'Search failed',
           suggestion: 'Try a simpler search or check your syntax.'
         })
-        setSearchResults([])
         setAllResults([])
         return
       }
@@ -442,7 +521,6 @@ function App() {
       addToHistory(query, finalResults.length)
 
       setAllResults(finalResults)
-      setSearchResults(finalResults.slice(0, 50))
       setDisplayCount(50)
     } finally {
       setIsSearching(false)
@@ -501,9 +579,7 @@ function App() {
   }
 
   function loadMoreResults() {
-    const newCount = displayCount + 50
-    setSearchResults(allResults.slice(0, newCount))
-    setDisplayCount(newCount)
+    setDisplayCount(c => c + 50)
   }
 
   function handleCardClick(card) {
@@ -897,7 +973,6 @@ function App() {
                 <button
                   onClick={() => {
                     setCurrentBrowsingSet(null)
-                    setSearchResults([])
                     setAllResults([])
                     setLastQuery('')
                   }}
@@ -910,8 +985,13 @@ function App() {
 
             {/* Results count */}
             {allResults.length > 0 && (
-              <p className={`${theme.textSecondary} text-sm mb-4 flex items-center gap-2`}>
-                <span>Showing {searchResults.length} of {allResults.length} results</span>
+              <p className={`${theme.textSecondary} text-sm mb-4 flex items-center gap-2 flex-wrap`}>
+                <span>
+                  Showing {displayedResults.length} of {processedResults.length} results
+                  {typeFilter.length > 0 && processedResults.length !== allResults.length && (
+                    <span className={`${theme.textSecondary}`}> (filtered from {allResults.length})</span>
+                  )}
+                </span>
                 {allResults.length >= 500 && <span>(limit reached)</span>}
                 {searchSource && (
                   <span className={`px-2 py-0.5 rounded text-xs ${
@@ -925,8 +1005,53 @@ function App() {
               </p>
             )}
 
+            {/* Sort + type filter bar */}
+            {allResults.length > 0 && (
+              <div className={`${theme.bgSecondary} rounded-lg p-3 mb-4 border ${theme.border} space-y-3`}>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className={`${theme.textSecondary} text-sm font-medium`}>Sort:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className={`${theme.bgTertiary} ${theme.text} text-sm rounded px-2 py-1 border ${theme.border} focus:outline-none`}
+                  >
+                    {SORT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {(sortBy !== 'default' || typeFilter.length > 0) && (
+                    <button
+                      onClick={resetResultFilters}
+                      className={`px-2 py-1 ${theme.bgTertiary} text-xs rounded hover:opacity-80`}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`${theme.textSecondary} text-sm font-medium mr-1`}>Types:</span>
+                  {CARD_TYPES.map(t => {
+                    const active = typeFilter.includes(t)
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => toggleTypeFilter(t)}
+                        className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                          active
+                            ? `${theme.accent} text-white border-transparent`
+                            : `${theme.bgTertiary} ${theme.textSecondary} ${theme.border} hover:opacity-80`
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {searchResults.map(card => {
+              {displayedResults.map(card => {
                 const isDFC = isDoubleFaced(card)
                 const isFlipped = flippedCards[card.id] || false
                 const cardImage = getCardImage(card, isFlipped)
@@ -984,18 +1109,18 @@ function App() {
             </div>
 
             {/* Load More button */}
-            {searchResults.length > 0 && searchResults.length < allResults.length && (
+            {displayedResults.length > 0 && displayedResults.length < processedResults.length && (
               <div className="flex justify-center mt-6">
                 <button
                   onClick={loadMoreResults}
                   className={`px-8 py-3 ${theme.accent} text-white rounded-lg font-medium shadow-lg ${theme.glow || ''}`}
                 >
-                  Load More ({allResults.length - searchResults.length} remaining)
+                  Load More ({processedResults.length - displayedResults.length} remaining)
                 </button>
               </div>
             )}
 
-            {searchResults.length === 0 && !searchError && !lastQuery && (
+            {allResults.length === 0 && !searchError && !lastQuery && (
               <div className={`text-center mt-8 space-y-4`}>
                 <p className={`${theme.textSecondary} text-lg`}>Start typing to search for cards</p>
                 <div className={`${theme.bgSecondary} rounded-lg p-4 max-w-md mx-auto text-left`}>
