@@ -77,7 +77,7 @@ function App() {
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
   const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
-  const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'rarity'
+  const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'color-wubrg' | 'rarity'
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
 
   // PWA Update handling
@@ -144,6 +144,28 @@ function App() {
           if (pb == null) return -1
           return dir * (pa - pb)
         })
+      } else if (sortBy === 'color-wubrg') {
+        // Standard WUBRG order: mono-white, mono-blue, mono-black, mono-red,
+        // mono-green, then multicolor (grouped by count, then lex by WUBRG),
+        // then colorless/lands at the end.
+        const COLOR_RANK = { W: 0, U: 1, B: 2, R: 3, G: 4 }
+        const colorKey = (card) => {
+          const cs = Array.isArray(card.colors) ? card.colors : []
+          if (cs.length === 0) return null
+          return cs.map(c => COLOR_RANK[c]).filter(r => r !== undefined).sort((a, b) => a - b)
+        }
+        working.sort((a, b) => {
+          const ka = colorKey(a)
+          const kb = colorKey(b)
+          if (ka == null && kb == null) return (a.name || '').localeCompare(b.name || '')
+          if (ka == null) return 1
+          if (kb == null) return -1
+          if (ka.length !== kb.length) return ka.length - kb.length
+          for (let i = 0; i < ka.length; i++) {
+            if (ka[i] !== kb[i]) return ka[i] - kb[i]
+          }
+          return (a.name || '').localeCompare(b.name || '')
+        })
       } else if (sortBy === 'cmc-asc' || sortBy === 'cmc-desc') {
         const dir = sortBy === 'cmc-asc' ? 1 : -1
         const cmcOf = (card) => {
@@ -201,6 +223,7 @@ function App() {
     { value: 'price-asc', label: 'Price (low → high)' },
     { value: 'cmc-asc', label: 'Mana value (low → high)' },
     { value: 'cmc-desc', label: 'Mana value (high → low)' },
+    { value: 'color-wubrg', label: 'Color (WUBRG)' },
     { value: 'rarity', label: 'Rarity (mythic → common)' },
   ]
 
