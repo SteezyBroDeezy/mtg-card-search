@@ -77,7 +77,7 @@ function App() {
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
   const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
-  const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'rarity'
+  const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'rarity'
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
 
   // PWA Update handling
@@ -144,6 +144,22 @@ function App() {
           if (pb == null) return -1
           return dir * (pa - pb)
         })
+      } else if (sortBy === 'cmc-asc' || sortBy === 'cmc-desc') {
+        const dir = sortBy === 'cmc-asc' ? 1 : -1
+        const cmcOf = (card) => {
+          const n = typeof card.cmc === 'number' ? card.cmc : parseFloat(card.cmc)
+          return Number.isFinite(n) ? n : null
+        }
+        working.sort((a, b) => {
+          const ca = cmcOf(a)
+          const cb = cmcOf(b)
+          // Cards without a mana value (most lands) sink to the end either way.
+          if (ca == null && cb == null) return (a.name || '').localeCompare(b.name || '')
+          if (ca == null) return 1
+          if (cb == null) return -1
+          if (ca === cb) return (a.name || '').localeCompare(b.name || '')
+          return dir * (ca - cb)
+        })
       } else if (sortBy === 'rarity') {
         working.sort((a, b) => {
           const ra = RARITY_RANK[a.rarity] ?? 99
@@ -183,6 +199,8 @@ function App() {
     { value: 'name-desc', label: 'Name Z → A' },
     { value: 'price-desc', label: 'Price (high → low)' },
     { value: 'price-asc', label: 'Price (low → high)' },
+    { value: 'cmc-asc', label: 'Mana value (low → high)' },
+    { value: 'cmc-desc', label: 'Mana value (high → low)' },
     { value: 'rarity', label: 'Rarity (mythic → common)' },
   ]
 
