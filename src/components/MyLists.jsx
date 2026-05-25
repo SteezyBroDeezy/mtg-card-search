@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   getLocalLists,
   createListLocal,
@@ -10,6 +10,8 @@ import {
   hasUnsyncedChanges,
   mergeListsLocal
 } from '../lib/listSync'
+import { db } from '../lib/db'
+import { sortCards, SORT_OPTIONS } from '../lib/cardSort'
 
 function MyLists({ userId, onClose, onCardClick }) {
   const [lists, setLists] = useState([])
@@ -25,6 +27,7 @@ function MyLists({ userId, onClose, onCardClick }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null) // list to confirm deletion
   const [selectMode, setSelectMode] = useState(false)
   const [selectedCards, setSelectedCards] = useState(new Set())
+  const [sortBy, setSortBy] = useState('default')
   // Merge dialog: source list to merge into another, target choice, name choice
   const [mergeSource, setMergeSource] = useState(null)
   const [mergeTargetId, setMergeTargetId] = useState('')
@@ -89,15 +92,45 @@ function MyLists({ userId, onClose, onCardClick }) {
   async function handleSelectList(list) {
     setSelectedList(list)
     setLoadingCards(true)
+    setSortBy('default')
     try {
       const listCards = await getListCardsLocal(list.id)
-      setCards(listCards)
+      // List rows only carry the bare minimum (id/name/image). Enrich each row
+      // with full metadata (cmc, colors, prices, rarity, type_line) from the
+      // local cards DB so the sort options that need those fields actually work.
+      const ids = listCards.map(c => c.cardId).filter(Boolean)
+      let enriched = listCards
+      if (ids.length > 0) {
+        try {
+          const fulls = await db.cards.bulkGet(ids)
+          enriched = listCards.map((row, i) => {
+            const full = fulls[i]
+            if (!full) return row
+            // Keep the list-row fields authoritative (cardId, name, image, note,
+            // addedAt, synced); add sortable metadata from the full card.
+            return {
+              ...row,
+              cmc: row.cmc ?? full.cmc,
+              colors: row.colors ?? full.colors,
+              type_line: row.type_line ?? full.type_line,
+              rarity: row.rarity ?? full.rarity,
+              prices: row.prices ?? full.prices,
+            }
+          })
+        } catch (err) {
+          console.warn('Could not enrich list cards from local DB:', err)
+        }
+      }
+      setCards(enriched)
     } catch (err) {
       console.error('Failed to load cards:', err)
     } finally {
       setLoadingCards(false)
     }
   }
+
+  // Sort the enriched list cards using the shared comparator.
+  const sortedCards = useMemo(() => sortCards(cards, sortBy), [cards, sortBy])
 
   function handleDeleteList(list) {
     setDeleteConfirm(list)
@@ -288,8 +321,8 @@ function MyLists({ userId, onClose, onCardClick }) {
               <p className="text-gray-500 text-center py-8">No cards in this list</p>
             ) : (
               <>
-                {/* Select mode controls */}
-                <div className="flex items-center gap-3 mb-4">
+                {/* Select mode + sort controls */}
+                <div className="flex flex-wrap items-center gap-3 mb-4">
                   <button
                     onClick={() => {
                       setSelectMode(!selectMode)
@@ -316,9 +349,21 @@ function MyLists({ userId, onClose, onCardClick }) {
                       {selectedCards.size} selected
                     </span>
                   )}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <label className="text-gray-400 text-sm font-medium">Sort:</label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-2 py-1 bg-gray-700 text-white rounded-lg text-sm border border-gray-600"
+                    >
+                      {SORT_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {cards.map(card => (
+                  {sortedCards.map(card => (
                     <div
                       key={card.cardId}
                       className={`relative group cursor-pointer ${selectMode && selectedCards.has(card.cardId) ? 'ring-2 ring-purple-500 rounded-lg' : ''}`}

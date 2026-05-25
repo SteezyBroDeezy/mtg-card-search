@@ -16,6 +16,7 @@ import { parseSearch, matchesFilters } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
+import { sortCards, SORT_OPTIONS } from './lib/cardSort'
 import {
   initPriceOracleCache,
   clearPriceOracleCache,
@@ -111,12 +112,6 @@ function App() {
   const processedResults = useMemo(() => {
     if (allResults.length === 0) return allResults
 
-    const RARITY_RANK = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, bonus: 5 }
-    const cardPriceForSort = (card) => {
-      const raw = card.prices?.usd ?? card.prices?.usd_foil ?? card.prices?.eur
-      const n = raw == null ? NaN : parseFloat(raw)
-      return Number.isFinite(n) ? n : null
-    }
     const cardHasType = (card, type) => {
       const tl = (card.type_line || '').toLowerCase()
       return tl.includes(type.toLowerCase())
@@ -126,72 +121,7 @@ function App() {
     if (typeFilter.length > 0) {
       working = working.filter(c => typeFilter.some(t => cardHasType(c, t)))
     }
-
-    if (sortBy !== 'default') {
-      // Don't mutate the original array — handleSearch holds a reference.
-      working = working.slice()
-      if (sortBy === 'name-asc' || sortBy === 'name-desc') {
-        const dir = sortBy === 'name-asc' ? 1 : -1
-        working.sort((a, b) => dir * (a.name || '').localeCompare(b.name || ''))
-      } else if (sortBy === 'price-desc' || sortBy === 'price-asc') {
-        const dir = sortBy === 'price-desc' ? -1 : 1
-        working.sort((a, b) => {
-          const pa = cardPriceForSort(a)
-          const pb = cardPriceForSort(b)
-          // Cards without a price always sink to the end regardless of direction.
-          if (pa == null && pb == null) return 0
-          if (pa == null) return 1
-          if (pb == null) return -1
-          return dir * (pa - pb)
-        })
-      } else if (sortBy === 'color-wubrg') {
-        // Standard WUBRG order: mono-white, mono-blue, mono-black, mono-red,
-        // mono-green, then multicolor (grouped by count, then lex by WUBRG),
-        // then colorless/lands at the end.
-        const COLOR_RANK = { W: 0, U: 1, B: 2, R: 3, G: 4 }
-        const colorKey = (card) => {
-          const cs = Array.isArray(card.colors) ? card.colors : []
-          if (cs.length === 0) return null
-          return cs.map(c => COLOR_RANK[c]).filter(r => r !== undefined).sort((a, b) => a - b)
-        }
-        working.sort((a, b) => {
-          const ka = colorKey(a)
-          const kb = colorKey(b)
-          if (ka == null && kb == null) return (a.name || '').localeCompare(b.name || '')
-          if (ka == null) return 1
-          if (kb == null) return -1
-          if (ka.length !== kb.length) return ka.length - kb.length
-          for (let i = 0; i < ka.length; i++) {
-            if (ka[i] !== kb[i]) return ka[i] - kb[i]
-          }
-          return (a.name || '').localeCompare(b.name || '')
-        })
-      } else if (sortBy === 'cmc-asc' || sortBy === 'cmc-desc') {
-        const dir = sortBy === 'cmc-asc' ? 1 : -1
-        const cmcOf = (card) => {
-          const n = typeof card.cmc === 'number' ? card.cmc : parseFloat(card.cmc)
-          return Number.isFinite(n) ? n : null
-        }
-        working.sort((a, b) => {
-          const ca = cmcOf(a)
-          const cb = cmcOf(b)
-          // Cards without a mana value (most lands) sink to the end either way.
-          if (ca == null && cb == null) return (a.name || '').localeCompare(b.name || '')
-          if (ca == null) return 1
-          if (cb == null) return -1
-          if (ca === cb) return (a.name || '').localeCompare(b.name || '')
-          return dir * (ca - cb)
-        })
-      } else if (sortBy === 'rarity') {
-        working.sort((a, b) => {
-          const ra = RARITY_RANK[a.rarity] ?? 99
-          const rb = RARITY_RANK[b.rarity] ?? 99
-          return ra - rb
-        })
-      }
-    }
-
-    return working
+    return sortCards(working, sortBy)
   }, [allResults, sortBy, typeFilter])
 
   const displayedResults = useMemo(
@@ -215,17 +145,6 @@ function App() {
   }
 
   const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle']
-  const SORT_OPTIONS = [
-    { value: 'default', label: 'Default order' },
-    { value: 'name-asc', label: 'Name A → Z' },
-    { value: 'name-desc', label: 'Name Z → A' },
-    { value: 'price-desc', label: 'Price (high → low)' },
-    { value: 'price-asc', label: 'Price (low → high)' },
-    { value: 'cmc-asc', label: 'Mana value (low → high)' },
-    { value: 'cmc-desc', label: 'Mana value (high → low)' },
-    { value: 'color-wubrg', label: 'Color (WUBRG)' },
-    { value: 'rarity', label: 'Rarity (mythic → common)' },
-  ]
 
   useEffect(() => {
     checkDatabase()
