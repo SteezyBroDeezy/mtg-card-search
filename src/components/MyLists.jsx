@@ -122,12 +122,65 @@ function MyLists({ userId, onClose, onCardClick }) {
         }
       }
       setCards(enriched)
+
+      // Rows the local DB couldn't fill in (online mode, or a printing that
+      // predates the last DB download) still need prices — pull those from
+      // Scryfall's collection endpoint, 75 ids at a time.
+      const missing = enriched.filter(c => c.cardId && priceOf(c) == null)
+      if (missing.length > 0 && navigator.onLine) {
+        fetchPricesFromScryfall(missing.map(c => c.cardId)).then(priceMap => {
+          if (Object.keys(priceMap).length === 0) return
+          setCards(prev => prev.map(c => (
+            priceOf(c) != null || !priceMap[c.cardId] ? c : { ...c, prices: priceMap[c.cardId] }
+          )))
+        })
+      }
     } catch (err) {
       console.error('Failed to load cards:', err)
     } finally {
       setLoadingCards(false)
     }
   }
+
+  // Look up current prices for card ids Scryfall knows about.
+  // Returns { [cardId]: pricesObject } — best effort, never throws.
+  async function fetchPricesFromScryfall(ids) {
+    const out = {}
+    try {
+      for (let i = 0; i < ids.length; i += 75) {
+        const batch = ids.slice(i, i + 75).map(id => ({ id }))
+        const res = await fetch('https://api.scryfall.com/cards/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifiers: batch })
+        })
+        if (!res.ok) break
+        const data = await res.json()
+        for (const card of data.data || []) {
+          if (card.id && card.prices) out[card.id] = card.prices
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch prices from Scryfall:', err)
+    }
+    return out
+  }
+
+  // Best available USD price for a list row, or null.
+  function priceOf(card) {
+    const raw = card.prices?.usd ?? card.prices?.usd_foil ?? null
+    const n = raw == null ? NaN : parseFloat(raw)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const listTotal = useMemo(
+    () => cards.reduce((sum, c) => sum + (priceOf(c) || 0), 0),
+    [cards]
+  )
+  const pricedCount = useMemo(
+    () => cards.filter(c => priceOf(c) != null).length,
+    [cards]
+  )
 
   // Sort the enriched list cards using the shared comparator.
   const sortedCards = useMemo(() => sortCards(cards, sortBy), [cards, sortBy])
@@ -350,6 +403,9 @@ function MyLists({ userId, onClose, onCardClick }) {
                     </span>
                   )}
                   <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-gray-400 text-sm" title={`${pricedCount} of ${cards.length} cards have a Scryfall price`}>
+                      Total: <span className="text-green-400 font-semibold">${listTotal.toFixed(2)}</span>
+                    </span>
                     <label className="text-gray-400 text-sm font-medium">Sort:</label>
                     <select
                       value={sortBy}
@@ -390,6 +446,17 @@ function MyLists({ userId, onClose, onCardClick }) {
                         className="w-full rounded-lg"
                         loading="lazy"
                       />
+                      {/* Scryfall price badge — foil price is used only when
+                          there's no non-foil price, so label it. */}
+                      <div className="absolute bottom-1 left-1 right-1 flex justify-center pointer-events-none">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          priceOf(card) != null ? 'bg-black/80 text-green-400' : 'bg-black/70 text-gray-400'
+                        }`}>
+                          {priceOf(card) != null
+                            ? `$${priceOf(card).toFixed(2)}${!card.prices?.usd && card.prices?.usd_foil ? ' foil' : ''}`
+                            : 'No price'}
+                        </span>
+                      </div>
                     {card.note && (
                       <div className="mt-1 text-xs text-gray-400 truncate">{card.note}</div>
                     )}

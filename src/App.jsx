@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import SearchBar from './components/SearchBar'
 import CardDetail from './components/CardDetail'
 import QuickCardView from './components/QuickCardView'
@@ -11,8 +11,8 @@ import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db } from './lib/db'
-import { downloadCards, syncNewCards, syncNewCardsFromScryfall } from './lib/scryfall'
-import { parseSearch, matchesFilters } from './lib/search'
+import { downloadCards, syncNewCards, autoSyncNewCards } from './lib/scryfall'
+import { parseSearch, matchesFilters, normalizeQuotes } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
@@ -38,6 +38,10 @@ function App() {
   const [dbStatus, setDbStatus] = useState('checking')
   const [cardCount, setCardCount] = useState(0)
   const [downloadProgress, setDownloadProgress] = useState(null)
+  // When the card DB was last refreshed, and a transient banner describing
+  // the result of the most recent update.
+  const [lastDbSync, setLastDbSync] = useState(null)
+  const [syncNotice, setSyncNotice] = useState(null)
   // 'online' = query Scryfall API live, no DB needed.
   // 'offline' = use local IndexedDB. PWA defaults to offline; web defaults to online.
   const [appMode, setAppMode] = useState(() => {
@@ -81,18 +85,69 @@ function App() {
   const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'color-wubrg' | 'rarity'
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
 
-  // PWA Update handling
+  // PWA update handling. registerType is 'prompt', so needRefresh flips to
+  // true when a newer build has downloaded and is waiting; nothing reloads
+  // until the ribbon's Update button calls updateServiceWorker(true).
+  const swRegistrationRef = useRef(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [applyingUpdate, setApplyingUpdate] = useState(false)
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegistered(r) {
-      console.log('SW Registered:', r)
+    onRegisteredSW(swUrl, r) {
+      swRegistrationRef.current = r || null
+      if (!r) return
+      // A service worker only looks for a new build on page load. An
+      // installed PWA can stay open (or suspended) for days, so poll hourly
+      // as well — that's what makes the ribbon show up on its own.
+      setInterval(() => { r.update().catch(() => {}) }, 60 * 60 * 1000)
     },
     onRegisterError(error) {
       console.log('SW registration error:', error)
     },
   })
+
+  // Mirror needRefresh into a ref so async callbacks can read it fresh.
+  const needRefreshRef = useRef(false)
+  useEffect(() => { needRefreshRef.current = needRefresh }, [needRefresh])
+
+  // Also check whenever the app comes back to the foreground or regains a
+  // connection — the common case on a phone.
+  useEffect(() => {
+    function checkForUpdate() {
+      if (document.visibilityState !== 'visible') return
+      swRegistrationRef.current?.update().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', checkForUpdate)
+    window.addEventListener('focus', checkForUpdate)
+    window.addEventListener('online', checkForUpdate)
+    return () => {
+      document.removeEventListener('visibilitychange', checkForUpdate)
+      window.removeEventListener('focus', checkForUpdate)
+      window.removeEventListener('online', checkForUpdate)
+    }
+  }, [])
+
+  // Manual "Check for updates" from Settings. If a new build is waiting the
+  // ribbon appears; otherwise we say so explicitly.
+  async function handleCheckForUpdate() {
+    setShowSettings(false)
+    setCheckingUpdate(true)
+    try {
+      await swRegistrationRef.current?.update()
+      // The hook flips needRefresh asynchronously once the new worker
+      // installs; give it a moment before declaring us up to date.
+      setTimeout(() => {
+        if (!needRefreshRef.current) showSyncNotice('App is up to date')
+      }, 2000)
+    } catch (error) {
+      console.error('Update check failed:', error)
+      showSyncNotice('Could not check for updates — are you online?')
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
 
   const theme = themes[currentTheme]
 
@@ -262,9 +317,18 @@ function App() {
     if (exists) {
       const info = await getDbInfo()
       setCardCount(info.cardCount)
+      setLastDbSync(info.lastSync)
       setDbStatus('ready')
-      // Auto-sync new cards from Scryfall when on WiFi (once per day)
-      syncNewCardsFromScryfall()
+      // Incremental auto-sync once a day on an unmetered connection.
+      autoSyncNewCards().then(async (result) => {
+        if (!result) return
+        setCardCount(result.total)
+        const fresh = await getDbInfo()
+        setLastDbSync(fresh.lastSync)
+        if (result.added > 0) {
+          showSyncNotice(`Added ${result.added.toLocaleString()} new card${result.added === 1 ? '' : 's'}`)
+        }
+      })
       // Don't call handleSearch here — its closure would still see
       // dbStatus='checking' and misroute the restored query to Scryfall.
       // The restore happens in the useEffect below, keyed on dbStatus.
@@ -291,15 +355,26 @@ function App() {
     setDidRestoreQuery(true)
   }, [dbStatus, appMode, didRestoreQuery])
 
+  // Show a short-lived banner about the last database update.
+  const syncNoticeTimer = useRef(null)
+  function showSyncNotice(message) {
+    setSyncNotice(message)
+    clearTimeout(syncNoticeTimer.current)
+    syncNoticeTimer.current = setTimeout(() => setSyncNotice(null), 6000)
+  }
+
   async function handleDownload() {
     setDbStatus('downloading')
     try {
-      const count = await downloadCards((progress) => {
+      const result = await downloadCards((progress) => {
         setDownloadProgress(progress)
       })
-      setCardCount(count)
+      setCardCount(result.total)
+      const info = await getDbInfo()
+      setLastDbSync(info.lastSync)
       setDbStatus('ready')
       setDownloadProgress(null)
+      showSyncNotice(`Downloaded ${result.total.toLocaleString()} cards`)
     } catch (error) {
       console.error('Download failed:', error)
       setDbStatus('error')
@@ -308,20 +383,48 @@ function App() {
 
   async function handleSync() {
     setShowSettings(false)
+    if (!navigator.onLine) {
+      showSyncNotice('No internet connection — connect and try again')
+      return
+    }
     // Incremental sync: only fetches cards released since last sync.
     // Falls back to a full download if there's no prior sync state.
+    const before = cardCount
     setDbStatus('downloading')
     try {
-      const count = await syncNewCards((progress) => {
+      const result = await syncNewCards((progress) => {
         setDownloadProgress(progress)
       })
-      setCardCount(count)
+      setCardCount(result.total)
+      const info = await getDbInfo()
+      setLastDbSync(info.lastSync)
       setDbStatus('ready')
       setDownloadProgress(null)
+      const added = result.fullDownload ? Math.max(0, result.total - before) : result.added
+      showSyncNotice(
+        added > 0
+          ? `Added ${added.toLocaleString()} new card${added === 1 ? '' : 's'} — ${result.total.toLocaleString()} total`
+          : `Already up to date — ${result.total.toLocaleString()} cards`
+      )
     } catch (error) {
       console.error('Sync failed:', error)
       setDbStatus('error')
+      showSyncNotice('Update failed — check your connection and try again')
     }
+  }
+
+  // "3 days ago" style label for the card database's last refresh.
+  function formatDbSync(iso) {
+    if (!iso) return 'never updated'
+    const ms = Date.now() - new Date(iso).getTime()
+    if (Number.isNaN(ms)) return 'never updated'
+    const mins = Math.floor(ms / 60000)
+    if (mins < 1) return 'updated just now'
+    if (mins < 60) return `updated ${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `updated ${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `updated ${days}d ago`
   }
 
   // Helper to get best price from a card
@@ -412,7 +515,10 @@ function App() {
     }
   }
 
-  async function handleSearch(query) {
+  async function handleSearch(rawQuery) {
+    // Mobile keyboards produce curly quotes; fold them so phrase filters
+    // like o:"whenever you gain life" work the same on phone and desktop.
+    const query = normalizeQuotes(rawQuery)
     setLastQuery(query)
     setSearchError(null)
     setSearchSource(null)
@@ -853,6 +959,19 @@ function App() {
           </div>
         )}
 
+        {syncNotice && (
+          <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${theme.bgSecondary} border ${theme.border} flex items-center justify-between gap-3`}>
+            <span className={theme.text}>{syncNotice}</span>
+            <button
+              onClick={() => setSyncNotice(null)}
+              className={`${theme.textSecondary} text-lg leading-none px-1`}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {!showPriceOracle && (appMode === 'online' || dbStatus === 'ready') && (
           <>
             <div className="mb-6">
@@ -898,7 +1017,17 @@ function App() {
                     <>
                       <p className={`${theme.textSecondary} text-sm`}>
                         {cardCount.toLocaleString()} cards in database
+                        <span className="opacity-70"> · {formatDbSync(lastDbSync)}</span>
                       </p>
+                      <button
+                        onClick={handleSync}
+                        disabled={dbStatus === 'downloading'}
+                        className={`px-3 py-1.5 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium hover:border-green-500 transition-colors flex items-center gap-2 disabled:opacity-60`}
+                        title="Fetch cards released since the last update"
+                      >
+                        <span>⟳</span>
+                        {dbStatus === 'downloading' ? 'Updating…' : 'Update Cards'}
+                      </button>
                       <button
                         onClick={() => setShowSetsBrowser(true)}
                         className={`px-3 py-1.5 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium hover:border-purple-500 transition-colors flex items-center gap-2`}
@@ -1142,20 +1271,42 @@ function App() {
         )}
       </main>
 
-      {/* PWA Update Banner */}
+      {/* PWA update ribbon — appears on its own when a newer build has
+          downloaded. Tapping Update swaps in the new service worker and
+          reloads; nothing is lost, lists and the card DB are untouched. */}
       {needRefresh && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-blue-600 text-white p-4 rounded-xl shadow-2xl z-[100] animate-bounce">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="font-semibold">Update Available!</p>
-              <p className="text-sm text-blue-100">Tap to get the latest version</p>
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[100] p-3 pointer-events-none"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        >
+          <div className="pointer-events-auto mx-auto max-w-md bg-blue-600 text-white p-4 rounded-xl shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold">New version available</p>
+                <p className="text-sm text-blue-100">
+                  {applyingUpdate ? 'Updating…' : 'Your lists and card database are kept'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setNeedRefresh(false)}
+                  disabled={applyingUpdate}
+                  className="px-3 py-2 text-sm text-blue-100 underline disabled:opacity-50"
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    setApplyingUpdate(true)
+                    updateServiceWorker(true)
+                  }}
+                  disabled={applyingUpdate}
+                  className="px-4 py-3 min-h-[44px] bg-white text-blue-600 rounded-lg font-bold text-sm whitespace-nowrap disabled:opacity-70"
+                >
+                  {applyingUpdate ? 'Updating…' : 'Update Now'}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => updateServiceWorker(true)}
-              className="px-4 py-2 bg-white text-blue-600 rounded-lg font-bold text-sm whitespace-nowrap"
-            >
-              Update Now
-            </button>
           </div>
         </div>
       )}
@@ -1234,6 +1385,10 @@ function App() {
           onAppModeChange={setAppMode}
           dbStatus={dbStatus}
           onDownload={handleDownload}
+          lastDbSyncLabel={formatDbSync(lastDbSync)}
+          onCheckForUpdate={handleCheckForUpdate}
+          checkingUpdate={checkingUpdate}
+          buildTime={import.meta.env.VITE_BUILD_TIME}
         />
       )}
 

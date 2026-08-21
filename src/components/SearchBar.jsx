@@ -356,15 +356,18 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     const existingOracleMatches = query.match(/o:"[^"]+"/g) || []
 
     // Add oracleValue from the input field if set
-    if (oracleValue) {
-      parts.push(`o:"${oracleValue}"`)
+    // Strip any quotes the user typed (or a phone keyboard inserted) so we
+    // always emit exactly one well-formed quoted phrase.
+    const oracleClean = oracleValue.replace(/["\u201C\u201D]/g, '').trim()
+    if (oracleClean) {
+      parts.push(`o:"${oracleClean}"`)
     }
 
     // Add any existing oracle text filters from the query
     existingOracleMatches.forEach(match => {
       // Don't duplicate if it's the same as oracleValue
       const matchValue = match.match(/o:"([^"]+)"/)?.[1]
-      if (matchValue && matchValue !== oracleValue) {
+      if (matchValue && matchValue !== oracleClean) {
         parts.push(match)
       }
     })
@@ -417,6 +420,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
   const tabs = [
     { id: 'colors', label: 'Colors' },
+    { id: 'text', label: 'Card Text' },
     { id: 'types', label: 'Types' },
     { id: 'stats', label: 'Stats' },
     { id: 'formats', label: 'Formats' },
@@ -584,11 +588,15 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
           {/* Autocomplete Suggestions */}
           {showSuggestions && suggestions.length > 0 && (
+            /* Only the mouse path is blocked here. preventDefault on
+               touchstart also cancels the synthesized click on mobile
+               Safari, which is why taps used to do nothing — touch picks
+               go through onPointerDown on each row instead. */
             <div
               ref={suggestionsRef}
               onMouseDown={(e) => e.preventDefault()}
-              onTouchStart={(e) => e.preventDefault()}
-              className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden`}
+              className={`absolute top-full left-0 right-0 mt-1 ${theme.bgSecondary} border ${theme.border} rounded-lg shadow-xl z-50 overflow-hidden divide-y divide-white/10`}
+              style={{ touchAction: 'manipulation' }}
             >
               {suggestions.map((suggestion, idx) => {
                 const displayName = typeof suggestion === 'object' ? suggestion.displayName : suggestion
@@ -598,11 +606,18 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                     key={key}
                     role="button"
                     tabIndex={0}
-                    onClick={() => handleSuggestionClick(suggestion)}
+                    /* pointerdown covers mouse and touch alike and lands
+                       before the input's blur timer tears the list down, so
+                       one tap always registers. */
+                    onPointerDown={(e) => {
+                      e.preventDefault()
+                      handleSuggestionClick(suggestion)
+                    }}
                     onKeyDown={(e) => e.key === 'Enter' && handleSuggestionClick(suggestion)}
-                    className={`w-full px-4 py-3 text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer ${
+                    className={`w-full px-4 py-3.5 min-h-[52px] flex items-center text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer select-none ${
                       idx === selectedSuggestionIndex ? 'bg-blue-600/40' : ''
                     } ${theme.text}`}
+                    style={{ touchAction: 'manipulation' }}
                   >
                     {displayName}
                   </div>
@@ -1188,6 +1203,63 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
               </div>
             )}
 
+            {/* Card Text Tab - free-form oracle text search */}
+            {activeTab === 'text' && (
+              <div className="space-y-4">
+                <div>
+                  <p className={`${theme.text} font-medium mb-1`}>Find cards by what they say</p>
+                  <p className={`${theme.textSecondary} text-xs mb-3`}>
+                    Type any wording that appears on the card — no quotes or syntax needed.
+                  </p>
+                  <input
+                    type="text"
+                    value={oracleValue}
+                    onChange={(e) => setOracleValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        applyFilters()
+                      }
+                    }}
+                    placeholder="whenever you gain life"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className={`w-full px-3 py-3 text-base ${theme.bgTertiary} rounded-lg`}
+                  />
+                  {oracleValue.trim() && (
+                    <p className={`${theme.textSecondary} text-xs mt-2`}>
+                      Searches for <code className="text-blue-400">o:"{oracleValue.trim()}"</code> when you tap Apply Filters.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className={`${theme.textSecondary} text-sm mb-2`}>Common phrases — tap to use:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['whenever you gain life', 'draw a card', 'destroy target creature', 'enters the battlefield',
+                      'create a token', 'search your library', 'counter target spell', '+1/+1 counter',
+                      'sacrifice a creature', 'add one mana of any color'].map(phrase => (
+                      <button
+                        key={phrase}
+                        type="button"
+                        onClick={() => setOracleValue(phrase)}
+                        className={`px-2.5 py-2 text-xs ${theme.bgTertiary} hover:bg-blue-600 hover:text-white rounded transition-colors ${
+                          oracleValue === phrase ? 'ring-2 ring-blue-400' : ''
+                        }`}
+                      >
+                        {phrase}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className={`${theme.textSecondary} text-xs`}>
+                  Tip: combine this with the other tabs — card text plus colors, types, or price all apply together.
+                </p>
+              </div>
+            )}
+
             {/* Keywords Tab */}
             {activeTab === 'keywords' && (
               <div>
@@ -1214,9 +1286,25 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                     type="text"
                     value={oracleValue}
                     onChange={(e) => setOracleValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        applyFilters()
+                      }
+                    }}
                     placeholder='e.g. "draw a card", "destroy target"'
-                    className={`w-full px-3 py-2 ${theme.bgTertiary} rounded-lg`}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className={`w-full px-3 py-3 text-base ${theme.bgTertiary} rounded-lg`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('text')}
+                    className="text-blue-400 text-xs mt-2 underline"
+                  >
+                    More card-text options →
+                  </button>
                 </div>
               </div>
             )}

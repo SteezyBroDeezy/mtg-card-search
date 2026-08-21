@@ -1,6 +1,6 @@
 import { themes, saveTheme } from '../lib/theme'
 
-function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange, appMode, onAppModeChange, dbStatus, onDownload }) {
+function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange, appMode, onAppModeChange, dbStatus, onDownload, lastDbSyncLabel, onCheckForUpdate, checkingUpdate, buildTime }) {
   function handleThemeClick(themeName) {
     saveTheme(themeName)
     onThemeChange(themeName)
@@ -129,12 +129,12 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
           <h3 className={`font-medium mb-3 ${theme.text}`}>Database</h3>
           <p className={`${theme.textSecondary} text-sm mb-1`}>
             {dbStatus === 'ready'
-              ? `${cardCount.toLocaleString()} cards stored locally`
+              ? `${cardCount.toLocaleString()} cards stored locally · ${lastDbSyncLabel || 'never updated'}`
               : 'No local database — running in online mode'}
           </p>
           <p className={`${theme.textSecondary} text-xs mb-3`}>
             {dbStatus === 'ready'
-              ? 'Re-sync to get the latest cards and prices from Scryfall'
+              ? 'Updating only downloads cards released since the last update, plus refreshed prices — it takes seconds, not minutes. Also runs automatically once a day on Wi-Fi.'
               : 'Download the database to enable offline search'}
           </p>
 
@@ -142,11 +142,35 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
             onClick={onSync}
             className={`w-full py-3 ${theme.accent} text-white rounded-lg font-medium`}
           >
-            {dbStatus === 'ready' ? 'Sync Card Database' : 'Download Card Database'}
+            {dbStatus === 'ready' ? 'Update Card Database' : 'Download Card Database'}
           </button>
           <p className={`${theme.textSecondary} text-xs text-center mt-2`}>
-            Downloads ~27,000 unique cards. Works on mobile!
+            {dbStatus === 'ready'
+              ? 'Needs an internet connection.'
+              : 'Downloads ~30,000 unique cards. Works on mobile!'}
           </p>
+        </div>
+
+        {/* App version */}
+        <div className={`border-t ${theme.border} pt-4 mt-4`}>
+          <h3 className={`font-medium mb-3 ${theme.text}`}>App Version</h3>
+          <p className={`${theme.textSecondary} text-xs mb-3`}>
+            The app updates itself in the background — when a new version is ready an
+            Update ribbon appears at the bottom of the screen. You never need to
+            delete and re-install it.
+          </p>
+          <button
+            onClick={onCheckForUpdate}
+            disabled={checkingUpdate}
+            className={`w-full py-3 ${theme.bgTertiary} border ${theme.border} ${theme.text} rounded-lg font-medium disabled:opacity-60`}
+          >
+            {checkingUpdate ? 'Checking…' : 'Check for Updates'}
+          </button>
+          {buildTime && (
+            <p className={`${theme.textSecondary} text-xs text-center mt-2`}>
+              Build {buildTime}
+            </p>
+          )}
         </div>
 
         {/* About */}

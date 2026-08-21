@@ -100,14 +100,16 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
       </div>
 
       {/* Card Image - Large and centered */}
-      <div
-        className="flex-1 flex items-center justify-center p-2 overflow-hidden"
-        onClick={(e) => {
-          e.stopPropagation()
-          onViewDetails()
-        }}
-      >
-        <div className="relative">
+      {/* Taps in the empty space around the card fall through to the
+          backdrop's onClose; only the card art itself opens details. */}
+      <div className="flex-1 flex items-center justify-center p-2 overflow-hidden">
+        <div
+          className="relative"
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewDetails()
+          }}
+        >
           {displayImage ? (
             <img
               src={displayImage}

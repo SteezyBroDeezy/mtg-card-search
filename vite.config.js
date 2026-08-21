@@ -5,11 +5,20 @@ import { defineConfig } from 'vite'
 
   export default defineConfig({
     base: '/mtg-card-search/',
+    // Stamped at build time so Settings can show which build is running.
+    define: {
+      'import.meta.env.VITE_BUILD_TIME': JSON.stringify(
+        new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+      )
+    },
     plugins: [
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        // 'prompt' (not autoUpdate) so a new version never reloads the page
+        // out from under you mid-search — App.jsx shows an Update ribbon and
+        // the reload happens when you tap it.
+        registerType: 'prompt',
         includeAssets: ['favicon.ico'],
         manifest: {
           name: 'MTG Card Search',
@@ -32,7 +41,9 @@ import { defineConfig } from 'vite'
           ]
         },
         workbox: {
-          skipWaiting: true,
+          // Must stay false for the prompt flow: the new worker waits until
+          // the ribbon's Update button sends it SKIP_WAITING.
+          skipWaiting: false,
           clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           runtimeCaching: [

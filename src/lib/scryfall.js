@@ -198,7 +198,8 @@ export async function downloadCards(onProgress) {
     detail: `${totalSaved.toLocaleString()} cards in ${totalTime} minutes`
   })
 
-  return totalSaved
+  // Shape matches syncNewCards so callers can treat both the same way.
+  return { total: totalSaved, added: totalSaved, updated: 0, fullDownload: true }
 }
 
 // Incremental sync: only fetch cards released since last sync.
@@ -226,6 +227,7 @@ export async function syncNewCards(onProgress) {
     detail: `Looking for cards since ${sinceStr}`
   })
 
+  const countBefore = cardCount
   const query = `game:paper date>=${sinceStr}`
   let nextUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
   let totalUpdated = 0
@@ -294,95 +296,53 @@ export async function syncNewCards(onProgress) {
   await db.meta.put({ key: 'lastReleaseSeen', value: latestRelease })
 
   const totalSeconds = ((Date.now() - startTime) / 1000).toFixed(1)
+  const total = await db.cards.count()
+  // bulkPut upserts, so "added" is the growth in row count; the rest were
+  // refreshed printings/prices.
+  const added = Math.max(0, total - countBefore)
+
   onProgress?.({
     step: 'Done!',
     percent: 100,
     detail: totalUpdated > 0
-      ? `${totalUpdated.toLocaleString()} card${totalUpdated === 1 ? '' : 's'} updated in ${totalSeconds}s`
+      ? `${added.toLocaleString()} new, ${(totalUpdated - added).toLocaleString()} refreshed in ${totalSeconds}s`
       : `Already up to date (checked in ${totalSeconds}s)`
   })
 
-  // Return the new total card count so callers can update UI state.
-  return await db.cards.count()
+  return { total, added, updated: totalUpdated, fullDownload: false }
 }
 
-// Search cards by oracle text or advanced Scryfall query
-export async function searchCardsByOracle(query) {
+// Background auto-sync: runs the same incremental sync as the Update button,
+// but only on an unmetered connection and at most once a day.
+export async function autoSyncNewCards() {
   try {
-    const searchQuery = `o:"${query}"`
-    const response = await fetch(
-      `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(searchQuery)}&unique=cards&order=name`
-    )
+    if (!navigator.onLine) return null
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return [] // No cards found
-      }
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    const data = await response.json()
-    if (data.data && data.data.length > 0) {
-      return data.data.map(processCard).filter(Boolean)
-    }
-
-    return []
-  } catch (error) {
-    console.error('Oracle text search error:', error)
-    return []
-  }
-}
-
-// Auto-sync new cards from Scryfall when on WiFi (runs once per day)
-export async function syncNewCardsFromScryfall() {
-  try {
-    // Check if on WiFi or ethernet
+    // Skip metered/cellular links so a phone doesn't burn data on open.
     const connection = navigator.connection
     if (connection) {
-      const connectionType = connection.effectiveType || connection.type || ''
-      // Only sync on WiFi/ethernet (4g and 5g mean metered mobile)
-      if (connectionType === '4g' || connectionType === '5g' || connectionType === 'cellular') {
-        console.log('On mobile network, skipping auto-sync')
-        return
-      }
+      if (connection.saveData) return null
+      const type = connection.type || ''
+      const effective = connection.effectiveType || ''
+      const metered = type === 'cellular' ||
+        (type === '' && (effective === '2g' || effective === '3g'))
+      if (metered) return null
     }
 
-    // Check last sync time
-    const lastSyncKey = 'mtg-last-card-sync'
-    const lastSync = localStorage.getItem(lastSyncKey)
-    const now = Date.now()
+    const lastSyncKey = 'mtg-last-auto-sync'
+    const last = parseInt(localStorage.getItem(lastSyncKey) || '0', 10)
     const oneDayMs = 24 * 60 * 60 * 1000
+    if (last && Date.now() - last < oneDayMs) return null
 
-    if (lastSync) {
-      const lastSyncTime = parseInt(lastSync, 10)
-      if (now - lastSyncTime < oneDayMs) {
-        console.log('Already synced today, skipping')
-        return
-      }
-    }
+    // Never let a background job trigger a multi-minute full download.
+    const lastReleaseMeta = await db.meta.get('lastReleaseSeen')
+    if (!lastReleaseMeta?.value) return null
 
-    // Fetch latest cards from Scryfall (released in 2024+)
-    const query = `released>=2024-01-01 game:paper`
-    const searchUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=-released&per_page=20`
-
-    const response = await fetch(searchUrl)
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    const data = await response.json()
-    if (data.data && data.data.length > 0) {
-      const cards = data.data.map(processCard).filter(Boolean)
-      if (cards.length > 0) {
-        // Store in IndexedDB
-        await db.cards.bulkPut(cards)
-        console.log(`Synced ${cards.length} new cards`)
-      }
-    }
-
-    // Update last sync time
-    localStorage.setItem(lastSyncKey, now.toString())
+    const result = await syncNewCards()
+    localStorage.setItem(lastSyncKey, Date.now().toString())
+    return result
   } catch (error) {
     console.error('Auto-sync error:', error)
+    return null
   }
 }

@@ -660,7 +660,17 @@ const SCRYFALL_ONLY_PATTERNS = [
   /^tix[<>=]/i,        // MTGO tickets
 ]
 
-export function parseSearch(query) {
+// Mobile keyboards (iOS especially) turn straight quotes into typographic
+// ones, which broke phrase filters like o:"whenever you gain life" — the
+// tokenizer below only understands ". Fold the curly forms back first.
+export function normalizeQuotes(query) {
+  return (query || '')
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+}
+
+export function parseSearch(rawQuery) {
+  const query = normalizeQuotes(rawQuery)
   const filters = []
   let nameSearch = ''
   let requiresScryfall = false
@@ -1114,6 +1124,12 @@ export function matchesFilters(card, filters, nameSearch) {
   return true
 }
 
+// Multi-word values need quoting or they'd tokenize as separate filters.
+function quoteIfNeeded(value) {
+  const v = String(value ?? '')
+  return /\s/.test(v) ? `"${v}"` : v
+}
+
 // Helper to build a search query from filter objects
 export function buildSearchQuery(filters) {
   const parts = []
@@ -1161,10 +1177,10 @@ export function buildSearchQuery(filters) {
         parts.push(`f:${filter.value}`)
         break
       case 'oracle':
-        parts.push(`o:${filter.value}`)
+        parts.push(`o:${quoteIfNeeded(filter.value)}`)
         break
       case 'artist':
-        parts.push(`a:${filter.value}`)
+        parts.push(`a:${quoteIfNeeded(filter.value)}`)
         break
       case 'keyword':
         parts.push(`k:${filter.value}`)
