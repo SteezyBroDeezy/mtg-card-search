@@ -15,6 +15,9 @@ import { downloadCards, syncNewCards, autoSyncNewCards } from './lib/scryfall'
 import { parseSearch, matchesFilters, normalizeQuotes } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
+import {
+  loadEffectLayers, saveEffectLayers, loadIntensity, saveIntensity
+} from './lib/effects'
 import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
 import { sortCards, SORT_OPTIONS } from './lib/cardSort'
 import { useSwipeToClose } from './lib/useSwipeToClose'
@@ -64,6 +67,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showPriceOracle, setShowPriceOracle] = useState(false)
   const [currentTheme, setCurrentTheme] = useState(loadTheme())
+  // Background effects are independent of the theme: 'auto' follows whatever
+  // the theme ships with, 'custom' stacks the chosen layers over any theme.
+  const [effectConfig, setEffectConfig] = useState(loadEffectLayers)
+  const [effectIntensity, setEffectIntensity] = useState(loadIntensity)
   const [searchHistory, setSearchHistory] = useState(() => {
     // Load from localStorage for non-logged-in users
     const saved = localStorage.getItem('mtg-search-history')
@@ -786,7 +793,12 @@ function App() {
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} relative overflow-hidden`}>
       {/* Theme particle effects */}
-      <ThemeEffects themeName={currentTheme} />
+      <ThemeEffects
+        themeName={currentTheme}
+        effectMode={effectConfig.mode}
+        effectLayers={effectConfig.layers}
+        intensity={effectIntensity}
+      />
 
       {/* Sites Navigation Bar - scrollable on mobile */}
       <div className={`${theme.bgSecondary} border-b border-gray-700 px-2 sm:px-4 py-1.5 overflow-x-auto`}>
@@ -1428,6 +1440,10 @@ function App() {
       {showSettings && (
         <Settings
           currentTheme={currentTheme}
+          effectConfig={effectConfig}
+          onEffectConfigChange={(next) => { saveEffectLayers(next); setEffectConfig(next) }}
+          effectIntensity={effectIntensity}
+          onEffectIntensityChange={(next) => { saveIntensity(next); setEffectIntensity(next) }}
           onThemeChange={setCurrentTheme}
           onClose={() => setShowSettings(false)}
           cardCount={cardCount}

@@ -1,8 +1,11 @@
 import { themes, saveTheme } from '../lib/theme'
+import { EFFECT_LAYERS, INTENSITY_OPTIONS } from '../lib/effects'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
 import SwipeHandle from './SwipeHandle'
 
-function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange, appMode, onAppModeChange, dbStatus, onDownload, lastDbSyncLabel, onCheckForUpdate, checkingUpdate, buildTime }) {
+function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange, appMode, onAppModeChange, dbStatus, onDownload, lastDbSyncLabel, onCheckForUpdate, checkingUpdate, buildTime,
+  effectConfig = { mode: 'auto', layers: [] }, onEffectConfigChange,
+  effectIntensity = 'normal', onEffectIntensityChange }) {
   const swipe = useSwipeToClose(onClose)
   function handleThemeClick(themeName) {
     saveTheme(themeName)
@@ -12,13 +15,36 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
   const theme = themes[currentTheme]
 
   // Group themes for display
-  const themeGroups = {
+  const namedGroups = {
     'Basic': ['dark', 'light'],
     'Mana Colors': ['white', 'blue', 'black', 'red', 'green'],
     'Guilds': ['boros', 'dimir', 'simic', 'rakdos', 'golgari'],
     'Lore': ['mystical', 'artifact', 'multicolor', 'phyrexian', 'eldrazi', 'bone'],
     'Planes': ['zendikar', 'innistrad', 'kamigawa'],
-    'Animated': ['dragon', 'planeswalker', 'neon', 'cosmic', 'goldMythic', 'iceStorm', 'bloodMoon']
+    'Animated': ['dragon', 'planeswalker', 'neon', 'cosmic', 'goldMythic', 'iceStorm', 'bloodMoon'],
+    'Ambient': ['deepSpace', 'nebula', 'aurora', 'fireflies', 'rainyDay', 'parchment'],
+  }
+
+  // Anything added to theme.js but not listed above still shows up, so a new
+  // theme can never be invisible in the picker.
+  const grouped = new Set(Object.values(namedGroups).flat())
+  const ungrouped = Object.keys(themes).filter(key => !grouped.has(key))
+  const themeGroups = ungrouped.length > 0
+    ? { ...namedGroups, 'More': ungrouped }
+    : namedGroups
+
+  const isAuto = effectConfig.mode === 'auto'
+  const activeLayers = isAuto ? [] : effectConfig.layers
+
+  function setMode(mode) {
+    onEffectConfigChange?.({ mode, layers: mode === 'auto' ? [] : activeLayers })
+  }
+
+  function toggleLayer(value) {
+    const next = activeLayers.includes(value)
+      ? activeLayers.filter(l => l !== value)
+      : [...activeLayers, value]
+    onEffectConfigChange?.({ mode: 'custom', layers: next })
   }
 
   return (
@@ -97,6 +123,97 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Background Effects — independent of the theme, so any effect can
+            be layered over any palette. */}
+        <div className={`border-t ${theme.border} pt-4 mb-6`}>
+          <h3 className={`font-medium mb-1 ${theme.text}`}>Background Effects</h3>
+          <p className={`${theme.textSecondary} text-xs mb-3`}>
+            Stack any of these over whichever theme you're using. They sit behind
+            the app and never intercept taps.
+          </p>
+
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setMode('auto')}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                isAuto ? 'border-blue-500 bg-blue-600/20 ' + theme.text : `${theme.bgTertiary} border-transparent ${theme.textSecondary}`
+              }`}
+            >
+              Match theme
+            </button>
+            <button
+              onClick={() => setMode('custom')}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                !isAuto ? 'border-blue-500 bg-blue-600/20 ' + theme.text : `${theme.bgTertiary} border-transparent ${theme.textSecondary}`
+              }`}
+            >
+              Choose my own
+            </button>
+          </div>
+
+          {!isAuto && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                {EFFECT_LAYERS.map(layer => {
+                  const on = activeLayers.includes(layer.value)
+                  return (
+                    <button
+                      key={layer.value}
+                      onClick={() => toggleLayer(layer.value)}
+                      className={`text-left p-3 rounded-lg border-2 transition-all ${
+                        on
+                          ? 'border-blue-500 bg-blue-600/20'
+                          : `${theme.bgTertiary} border-transparent hover:border-gray-500`
+                      }`}
+                    >
+                      <span className={`${theme.text} text-sm font-medium flex items-center gap-2`}>
+                        <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                          on ? 'bg-blue-500 border-blue-500 text-white' : `border-gray-500 ${theme.textSecondary}`
+                        }`}>
+                          {on ? '✓' : ''}
+                        </span>
+                        {layer.label}
+                      </span>
+                      <span className={`${theme.textSecondary} text-xs block mt-1 pl-6`}>
+                        {layer.description}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <p className={`${theme.textSecondary} text-xs mb-3`}>
+                {activeLayers.length === 0
+                  ? 'Nothing selected — the background stays plain.'
+                  : `${activeLayers.length} effect${activeLayers.length === 1 ? '' : 's'} active. Starfield + Planets + Space debris makes a full space scene.`}
+              </p>
+            </>
+          )}
+
+          <div>
+            <p className={`${theme.textSecondary} text-xs uppercase tracking-wide mb-2`}>Intensity</p>
+            <div className="flex gap-2">
+              {INTENSITY_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => onEffectIntensityChange?.(opt.value)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                    effectIntensity === opt.value
+                      ? 'border-blue-500 bg-blue-600/20 ' + theme.text
+                      : `${theme.bgTertiary} border-transparent ${theme.textSecondary}`
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className={`${theme.textSecondary} text-xs mt-2`}>
+              Controls how many particles appear and how visible they are. All effects
+              hold still if your phone has Reduce Motion switched on.
+            </p>
+          </div>
         </div>
 
         {/* Search Mode */}
