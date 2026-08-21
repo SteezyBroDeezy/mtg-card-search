@@ -11,7 +11,7 @@ import {
   mergeListsLocal
 } from '../lib/listSync'
 import { db } from '../lib/db'
-import { sortCards, SORT_OPTIONS } from '../lib/cardSort'
+import { sortCards, LIST_SORT_OPTIONS } from '../lib/cardSort'
 
 function MyLists({ userId, onClose, onCardClick }) {
   const [lists, setLists] = useState([])
@@ -412,7 +412,7 @@ function MyLists({ userId, onClose, onCardClick }) {
                       onChange={(e) => setSortBy(e.target.value)}
                       className="px-2 py-1 bg-gray-700 text-white rounded-lg text-sm border border-gray-600"
                     >
-                      {SORT_OPTIONS.map(opt => (
+                      {LIST_SORT_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>

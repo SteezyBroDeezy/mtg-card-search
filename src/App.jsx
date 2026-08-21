@@ -542,6 +542,27 @@ function App() {
       // Online mode (or no local DB available) → always go through Scryfall.
       const useScryfall = requiresScryfall || appMode === 'online' || dbStatus !== 'ready'
 
+      // A few filters can only run against Scryfall's API. If we're offline
+      // and the query needs one, say so instead of silently returning
+      // nothing — everything else still works from the local database.
+      if (useScryfall && !navigator.onLine) {
+        setAllResults([])
+        setDisplayCount(50)
+        setSearchError({
+          message: 'This search needs an internet connection',
+          issues: requiresScryfall
+            ? ['Your query uses a filter the offline database can\'t run (things like mv>=, is:reprint, order:, lang: or date>=).']
+            : ['The app is in online mode, which sends every search to Scryfall.'],
+          suggestions: requiresScryfall
+            ? [
+                'Offline-capable filters: name, t:, o:"...", c:, id:, cmc, pow, tou, r:, s:, f:, usd, year, a:, k:, is:, produces:',
+                'Example: t:creature o:"whenever you gain life" c:white',
+              ]
+            : ['Switch to offline mode in Settings to search your downloaded card database.'],
+        })
+        return
+      }
+
       let results
       try {
         if (useScryfall) {

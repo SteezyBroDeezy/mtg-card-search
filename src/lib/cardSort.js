@@ -11,9 +11,26 @@ export const SORT_OPTIONS = [
   { value: 'cmc-desc', label: 'Mana value (high → low)' },
   { value: 'color-wubrg', label: 'Color (WUBRG)' },
   { value: 'rarity', label: 'Rarity (mythic → common)' },
+  { value: 'type', label: 'Card type' },
+]
+
+// Lists carry an addedAt timestamp that search results don't, so they get
+// two extra options on top of the shared set.
+export const LIST_SORT_OPTIONS = [
+  ...SORT_OPTIONS,
+  { value: 'added-desc', label: 'Date added (newest first)' },
+  { value: 'added-asc', label: 'Date added (oldest first)' },
 ]
 
 const RARITY_RANK = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, bonus: 5 }
+
+// Rough "deck list" ordering: the types people group a list by, most
+// commonly first. Matched against type_line, so 'Artifact Creature' lands
+// under Creature (Creature is checked first).
+const TYPE_ORDER = [
+  'Creature', 'Planeswalker', 'Instant', 'Sorcery',
+  'Artifact', 'Enchantment', 'Battle', 'Land',
+]
 const COLOR_RANK = { W: 0, U: 1, B: 2, R: 3, G: 4 }
 
 function priceOf(card) {
@@ -34,6 +51,18 @@ function colorKey(card) {
 }
 
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '')
+
+function typeRank(card) {
+  const tl = (card.type_line || '').toLowerCase()
+  const i = TYPE_ORDER.findIndex(t => tl.includes(t.toLowerCase()))
+  return i === -1 ? TYPE_ORDER.length : i
+}
+
+function addedAtOf(card) {
+  const raw = card.addedAt
+  const n = typeof raw === 'number' ? raw : Date.parse(raw)
+  return Number.isFinite(n) ? n : null
+}
 
 /** Return a new array of cards sorted by the given sortBy value. */
 export function sortCards(cards, sortBy) {
@@ -95,9 +124,32 @@ export function sortCards(cards, sortBy) {
       out.sort((a, b) => {
         const ra = RARITY_RANK[a.rarity] ?? 99
         const rb = RARITY_RANK[b.rarity] ?? 99
+        if (ra === rb) return byName(a, b)
         return ra - rb
       })
       break
+
+    case 'type':
+      out.sort((a, b) => {
+        const ta = typeRank(a), tb = typeRank(b)
+        if (ta === tb) return byName(a, b)
+        return ta - tb
+      })
+      break
+
+    case 'added-desc':
+    case 'added-asc': {
+      const dir = sortBy === 'added-desc' ? -1 : 1
+      out.sort((a, b) => {
+        const aa = addedAtOf(a), ab = addedAtOf(b)
+        if (aa == null && ab == null) return byName(a, b)
+        if (aa == null) return 1
+        if (ab == null) return -1
+        if (aa === ab) return byName(a, b)
+        return dir * (aa - ab)
+      })
+      break
+    }
   }
 
   return out

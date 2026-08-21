@@ -669,6 +669,12 @@ export function normalizeQuotes(query) {
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
 }
 
+// Values may arrive quoted (t:"legendary creature"); the quotes are syntax,
+// not part of what we match against.
+function unquote(value) {
+  return (value || '').replace(/"/g, '').trim()
+}
+
 export function parseSearch(rawQuery) {
   const query = normalizeQuotes(rawQuery)
   const filters = []
@@ -753,12 +759,12 @@ export function parseSearch(rawQuery) {
     }
     // Color identity filter: id:wubrg, id:bg, etc.
     else if (lower.startsWith('id:')) {
-      const identity = lower.slice(3)
+      const identity = unquote(lower.slice(3))
       filters.push({ type: 'color_identity', value: identity, negated: isNegated })
     }
     // Type filter: t:creature, t:instant, etc.
     else if (lower.startsWith('t:')) {
-      const type = lower.slice(2)
+      const type = unquote(lower.slice(2))
       filters.push({ type: 'type', value: type, negated: isNegated })
     }
     // CMC filter: cmc:3, cmc<=2, cmc>=4
@@ -847,12 +853,12 @@ export function parseSearch(rawQuery) {
     }
     // Rarity filter: r:mythic, r:rare, etc.
     else if (lower.startsWith('r:')) {
-      const rarity = lower.slice(2)
+      const rarity = unquote(lower.slice(2))
       filters.push({ type: 'rarity', value: rarity, negated: isNegated })
     }
     // Set filter: s:dom, s:neo, etc.
     else if (lower.startsWith('s:')) {
-      const set = lower.slice(2)
+      const set = unquote(lower.slice(2))
       filters.push({ type: 'set', value: set, negated: isNegated })
     }
     // Format filter: f:modern, f:commander, etc.
@@ -882,7 +888,7 @@ export function parseSearch(rawQuery) {
     }
     // Special properties: is:commander, is:dfc, etc.
     else if (lower.startsWith('is:')) {
-      const prop = lower.slice(3)
+      const prop = unquote(lower.slice(3))
       filters.push({ type: 'is', value: prop, negated: isNegated })
     }
     // Otherwise it's a name search (negation doesn't apply to name search)

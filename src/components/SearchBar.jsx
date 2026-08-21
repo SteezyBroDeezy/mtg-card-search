@@ -56,6 +56,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
   const [edhrecValue, setEdhrecValue] = useState('')
 
   // Text filters
+  const [customType, setCustomType] = useState('')
   const [artistValue, setArtistValue] = useState('')
   const [oracleValue, setOracleValue] = useState('')
   const [setCode, setSetCode] = useState('')
@@ -288,6 +289,15 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     onSearch(query)
   }
 
+  // Types with a space ("legendary creature") must be quoted or they'd
+  // tokenize into two separate filters.
+  function addCustomType() {
+    const val = customType.trim().toLowerCase()
+    if (!val) return
+    insertFilter(`t:${/\s/.test(val) ? `"${val}"` : val}`)
+    setCustomType('')
+  }
+
   function insertFilter(filterText) {
     const newQuery = query ? `${query} ${filterText}` : filterText
     setQuery(newQuery)
@@ -411,6 +421,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     setYearValue('')
     setEdhrecValue('')
     setArtistValue('')
+    setCustomType('')
     setOracleValue('')
     setSetCode('')
     setQuery('')
@@ -887,28 +898,22 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      id="customTypeInput"
-                      placeholder="e.g. squirrel, frog, ox..."
-                      className={`flex-1 px-3 py-2 ${theme.bgTertiary} rounded-lg text-sm`}
+                      value={customType}
+                      onChange={(e) => setCustomType(e.target.value)}
+                      placeholder="e.g. squirrel, frog, legendary artifact..."
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className={`flex-1 px-3 py-3 text-base ${theme.bgTertiary} rounded-lg`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          const val = e.target.value.trim()
-                          if (val) {
-                            insertFilter(`t:${val.toLowerCase()}`)
-                            e.target.value = ''
-                          }
+                          e.preventDefault()
+                          addCustomType()
                         }
                       }}
                     />
                     <button
-                      onClick={() => {
-                        const input = document.getElementById('customTypeInput')
-                        const val = input.value.trim()
-                        if (val) {
-                          insertFilter(`t:${val.toLowerCase()}`)
-                          input.value = ''
-                        }
-                      }}
+                      onClick={addCustomType}
                       className={`px-4 py-2 ${theme.bgTertiary} rounded-lg text-sm hover:bg-blue-600 hover:text-white`}
                     >
                       Add
