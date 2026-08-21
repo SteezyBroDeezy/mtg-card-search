@@ -1,5 +1,7 @@
  import { useState } from 'react'
   import { signUp, logIn } from '../lib/firebase'
+  import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SwipeHandle from './SwipeHandle'
 
   function AuthModal({ onClose, onSuccess }) {
     const [isLogin, setIsLogin] = useState(true)
@@ -7,6 +9,7 @@
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+    const swipe = useSwipeToClose(onClose)
 
     async function handleSubmit(e) {
       e.preventDefault()
@@ -45,16 +48,22 @@
         onClick={onClose}
       >
         <div
-          className="bg-gray-800 rounded-xl w-full max-w-md p-6"
+          className="bg-gray-800 rounded-xl w-full max-w-md p-6 pt-2"
           onClick={(e) => e.stopPropagation()}
+          style={swipe.swipeStyle}
+          {...swipe.swipeHandlers}
         >
+          <SwipeHandle />
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">
               {isLogin ? 'Log In' : 'Create Account'}
             </h2>
-            <button onClick={onClose} className="text-gray-400
-  hover:text-white text-2xl">
-              x
+            <button
+              onClick={onClose}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20 text-gray-300 hover:text-white text-2xl leading-none"
+              aria-label="Close"
+            >
+              &times;
             </button>
           </div>
 

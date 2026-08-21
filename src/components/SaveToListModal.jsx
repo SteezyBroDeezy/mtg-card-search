@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
 import {
   getLocalLists,
   createListLocal,
@@ -73,6 +74,8 @@ function SaveToListModal({ card, userId, onClose, theme }) {
     }
   }
 
+  const swipe = useSwipeToClose(onClose)
+
   return (
     <div
       className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-[80]"
@@ -82,6 +85,8 @@ function SaveToListModal({ card, userId, onClose, theme }) {
       <div
         className={`${bgPrimary} w-full sm:max-w-md sm:mx-4 sm:rounded-xl rounded-t-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col animate-slide-up sm:animate-none`}
         onClick={(e) => e.stopPropagation()}
+        style={swipe.swipeStyle}
+        {...swipe.swipeHandlers}
       >
         {/* Drag handle for mobile */}
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -96,7 +101,8 @@ function SaveToListModal({ card, userId, onClose, theme }) {
           </div>
           <button
             onClick={onClose}
-            className={`${textSecondary} hover:text-white text-3xl leading-none p-2 -mr-2`}
+            className={`${textSecondary} hover:text-white text-3xl leading-none w-11 h-11 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20`}
+            aria-label="Close"
           >
             ×
           </button>

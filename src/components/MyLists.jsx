@@ -11,6 +11,8 @@ import {
   mergeListsLocal
 } from '../lib/listSync'
 import { db } from '../lib/db'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SwipeHandle from './SwipeHandle'
 import { sortCards, LIST_SORT_OPTIONS } from '../lib/cardSort'
 
 function MyLists({ userId, onClose, onCardClick }) {
@@ -34,6 +36,8 @@ function MyLists({ userId, onClose, onCardClick }) {
   const [mergeNameMode, setMergeNameMode] = useState('target') // 'target' | 'source' | 'custom'
   const [mergeCustomName, setMergeCustomName] = useState('')
   const [merging, setMerging] = useState(false)
+
+  const swipe = useSwipeToClose(onClose)
 
   useEffect(() => {
     loadLists()
@@ -309,14 +313,17 @@ function MyLists({ userId, onClose, onCardClick }) {
       <div
         className="bg-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        style={swipe.swipeStyle}
+        {...swipe.swipeHandlers}
       >
+        <SwipeHandle />
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {selectedList && (
               <button
                 onClick={() => { setSelectedList(null); setCards([]) }}
-                className="text-gray-400 hover:text-white"
+                className="min-h-[44px] px-3 flex items-center rounded-lg bg-white/10 active:bg-white/20 text-gray-300 hover:text-white text-sm font-medium"
               >
                 ← Back
               </button>
@@ -356,7 +363,11 @@ function MyLists({ userId, onClose, onCardClick }) {
             <span className="text-gray-500 text-xs">
               {formatSyncTime(lastSync)}
             </span>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">
+            <button
+              onClick={onClose}
+              className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20 text-gray-300 hover:text-white text-3xl leading-none"
+              aria-label="Close lists"
+            >
               ×
             </button>
           </div>
@@ -471,7 +482,8 @@ function MyLists({ userId, onClose, onCardClick }) {
                           e.stopPropagation()
                           handleRemoveCard(card.cardId)
                         }}
-                        className="absolute top-1 right-1 bg-red-600 hover:bg-red-500 text-white rounded-full w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                        className="absolute top-1 right-1 bg-red-600/90 hover:bg-red-500 active:bg-red-400 text-white rounded-full w-9 h-9 text-xl leading-none shadow-lg flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        aria-label={`Remove ${card.name} from list`}
                       >
                         ×
                       </button>

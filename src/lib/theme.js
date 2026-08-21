@@ -389,6 +389,101 @@ export const themes = {
     accent: 'bg-gradient-to-r from-pink-600 via-rose-500 to-red-500 hover:from-pink-500 hover:via-rose-400 hover:to-red-400',
     ring: 'ring-pink-400',
     glow: 'shadow-pink-500/50'
+  },
+
+  // ===== Ambient themes =====
+  // Each pairs a dark palette with one of the background effects in
+  // ThemeEffects.jsx. All are deliberately low-contrast in the background so
+  // card images stay the loudest thing on screen.
+
+  deepSpace: {
+    name: '🌠 Deep Space',
+    bg: 'bg-gradient-to-b from-black via-slate-950 to-indigo-950',
+    bgSecondary: 'bg-slate-900/80',
+    bgTertiary: 'bg-slate-800/80',
+    text: 'text-slate-100',
+    textSecondary: 'text-slate-400',
+    border: 'border-slate-700/70',
+    borderAccent: 'border-sky-400',
+    accent: 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500',
+    ring: 'ring-sky-400',
+    glow: 'shadow-sky-500/40',
+    special: 'starfield'
+  },
+
+  nebula: {
+    name: '🪐 Nebula',
+    bg: 'bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950',
+    bgSecondary: 'bg-slate-900/80',
+    bgTertiary: 'bg-purple-950/70',
+    text: 'text-purple-50',
+    textSecondary: 'text-purple-300',
+    border: 'border-purple-800/60',
+    borderAccent: 'border-fuchsia-400',
+    accent: 'bg-gradient-to-r from-fuchsia-600 to-cyan-600 hover:from-fuchsia-500 hover:to-cyan-500',
+    ring: 'ring-fuchsia-400',
+    glow: 'shadow-fuchsia-500/40',
+    special: 'nebula'
+  },
+
+  aurora: {
+    name: '🌌 Aurora',
+    bg: 'bg-gradient-to-b from-slate-950 via-emerald-950 to-slate-950',
+    bgSecondary: 'bg-slate-900/80',
+    bgTertiary: 'bg-emerald-950/70',
+    text: 'text-emerald-50',
+    textSecondary: 'text-emerald-300',
+    border: 'border-emerald-800/60',
+    borderAccent: 'border-teal-400',
+    accent: 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500',
+    ring: 'ring-teal-400',
+    glow: 'shadow-teal-500/40',
+    special: 'aurora'
+  },
+
+  fireflies: {
+    name: '🌿 Firefly Grove',
+    bg: 'bg-gradient-to-b from-neutral-950 via-green-950 to-neutral-950',
+    bgSecondary: 'bg-neutral-900/85',
+    bgTertiary: 'bg-green-950/70',
+    text: 'text-lime-50',
+    textSecondary: 'text-lime-300/80',
+    border: 'border-green-900/70',
+    borderAccent: 'border-lime-400',
+    accent: 'bg-gradient-to-r from-lime-600 to-amber-600 hover:from-lime-500 hover:to-amber-500',
+    ring: 'ring-lime-400',
+    glow: 'shadow-lime-500/40',
+    special: 'fireflies'
+  },
+
+  rainyDay: {
+    name: '🌧️ Rainy Night',
+    bg: 'bg-gradient-to-b from-slate-950 via-slate-900 to-gray-950',
+    bgSecondary: 'bg-slate-900/85',
+    bgTertiary: 'bg-slate-800/80',
+    text: 'text-slate-100',
+    textSecondary: 'text-slate-400',
+    border: 'border-slate-700/70',
+    borderAccent: 'border-blue-400',
+    accent: 'bg-gradient-to-r from-blue-700 to-slate-600 hover:from-blue-600 hover:to-slate-500',
+    ring: 'ring-blue-400',
+    glow: 'shadow-blue-500/30',
+    special: 'rain'
+  },
+
+  parchment: {
+    name: '📜 Old Parchment',
+    bg: 'bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900',
+    bgSecondary: 'bg-stone-900/85',
+    bgTertiary: 'bg-amber-950/60',
+    text: 'text-amber-50',
+    textSecondary: 'text-amber-200/70',
+    border: 'border-amber-900/60',
+    borderAccent: 'border-amber-500',
+    accent: 'bg-gradient-to-r from-amber-700 to-orange-800 hover:from-amber-600 hover:to-orange-700',
+    ring: 'ring-amber-500',
+    glow: 'shadow-amber-600/30',
+    special: 'dust'
   }
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
 
 function SetsBrowser({ theme, onClose, onSetClick }) {
   const [sets, setSets] = useState([])
@@ -134,8 +135,17 @@ function SetsBrowser({ theme, onClose, onSetClick }) {
   const displayedSets = filteredSets.slice(0, displayCount)
   const hasMore = filteredSets.length > displayCount
 
+  const swipe = useSwipeToClose(onClose)
+
   return (
-    <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/90 z-50 flex flex-col"
+      style={swipe.swipeStyle}
+      {...swipe.swipeHandlers}
+    >
+      <div className="flex justify-center pt-2 sm:hidden" aria-hidden="true">
+        <div className="w-10 h-1.5 rounded-full bg-white/30" />
+      </div>
       {/* Header */}
       <div className={`${theme.bgSecondary} border-b ${theme.border} p-4`}>
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
 import {
   isInWatchlistCached,
   addToWatchlistCached,
@@ -81,11 +82,20 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
   const price = card.prices?.usd ? `$${card.prices.usd}` :
     card.prices?.usd_foil ? `$${card.prices.usd_foil} foil` : null
 
+  // Swipe down anywhere on the overlay to dismiss it.
+  const swipe = useSwipeToClose(onClose)
+
   return (
     <div
       className="fixed inset-0 bg-black/90 z-50 flex flex-col"
       onClick={onClose}
+      style={swipe.swipeStyle}
+      {...swipe.swipeHandlers}
     >
+      <div className="flex justify-center pt-2" aria-hidden="true">
+        <div className="w-10 h-1.5 rounded-full bg-white/30" />
+      </div>
+
       {/* Close button */}
       <div className="flex justify-between items-center p-3">
         <div className="text-white font-semibold truncate flex-1 pr-4">
@@ -93,7 +103,8 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
         </div>
         <button
           onClick={onClose}
-          className="text-white text-3xl leading-none w-10 h-10 flex items-center justify-center"
+          className="text-white text-3xl leading-none w-12 h-12 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+          aria-label="Close"
         >
           ×
         </button>

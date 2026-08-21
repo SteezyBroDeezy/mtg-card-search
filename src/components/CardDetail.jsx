@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SwipeHandle from './SwipeHandle'
 import SaveToListModal from './SaveToListModal'
 import {
   isInWatchlistCached,
@@ -15,6 +17,9 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
   const [inWatchlist, setInWatchlist] = useState(false)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
   const [watchlistError, setWatchlistError] = useState(null)
+
+  // Pull the detail panel down to dismiss it.
+  const swipe = useSwipeToClose(onClose)
 
   useEffect(() => {
     if (user && card) {
@@ -126,10 +131,17 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
         <div
           className="bg-gray-800 rounded-xl max-w-4xl w-full my-2 sm:my-4"
           onClick={(e) => e.stopPropagation()}
+          style={swipe.swipeStyle}
+          {...swipe.swipeHandlers}
         >
+          <SwipeHandle />
           <div className="flex justify-between items-center p-3 sm:p-4 border-b border-gray-700 sticky top-0 bg-gray-800 z-10">
             <h2 className="text-lg sm:text-xl font-bold truncate pr-2">{card.name}</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl flex-shrink-0">
+            <button
+              onClick={onClose}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20 text-gray-300 hover:text-white text-2xl leading-none flex-shrink-0"
+              aria-label="Close"
+            >
               &times;
             </button>
           </div>

@@ -17,6 +17,8 @@ import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
 import { sortCards, SORT_OPTIONS } from './lib/cardSort'
+import { useSwipeToClose } from './lib/useSwipeToClose'
+import SwipeHandle from './components/SwipeHandle'
 import {
   initPriceOracleCache,
   clearPriceOracleCache,
@@ -84,6 +86,7 @@ function App() {
   const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
   const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'color-wubrg' | 'rarity'
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
+  const [showSortBar, setShowSortBar] = useState(false) // collapsed until asked for
 
   // PWA update handling. registerType is 'prompt', so needRefresh flips to
   // true when a newer build has downloaded and is waiting; nothing reloads
@@ -161,6 +164,14 @@ function App() {
     const days = Math.floor(hours / 24)
     return `${days}d ago`
   }
+
+  // Pull-down-to-dismiss for the search history sheet.
+  const historySwipe = useSwipeToClose(() => setShowHistory(false))
+
+  // How many result-level controls are active, shown on the collapsed toggle
+  // so a filter can never be silently hiding cards.
+  const activeResultFilterCount =
+    (sortBy !== 'default' ? 1 : 0) + typeFilter.length
 
   // Result-list post-processing: sort + type filter applied after search.
   // The query DSL filters happen earlier in handleSearch; these are display-time controls.
@@ -1117,8 +1128,29 @@ function App() {
               </p>
             )}
 
-            {/* Sort + type filter bar */}
+            {/* Sort + type filter bar — collapsed by default so results start
+                right below the search box; the toggle mirrors Syntax Help. */}
             {allResults.length > 0 && (
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowSortBar(!showSortBar)}
+                  className={`w-full flex items-center justify-between px-3 py-2 ${theme.bgSecondary} border ${theme.border} rounded-lg text-sm font-medium ${theme.text}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>⇅</span>
+                    Sort &amp; Filter
+                    {activeResultFilterCount > 0 && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-xs ${theme.accent} text-white`}>
+                        {activeResultFilterCount}
+                      </span>
+                    )}
+                  </span>
+                  <span className={theme.textSecondary}>{showSortBar ? '▲' : '▼'}</span>
+                </button>
+              </div>
+            )}
+
+            {allResults.length > 0 && showSortBar && (
               <div className={`${theme.bgSecondary} rounded-lg p-3 mb-4 border ${theme.border} space-y-3`}>
                 <div className="flex items-center gap-3 flex-wrap">
                   <label className={`${theme.textSecondary} text-sm font-medium`}>Sort:</label>
@@ -1422,25 +1454,21 @@ function App() {
           <div
             className={`${theme.bgSecondary} rounded-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col`}
             onClick={(e) => e.stopPropagation()}
+            style={historySwipe.swipeStyle}
+            {...historySwipe.swipeHandlers}
           >
+            <SwipeHandle />
+            {/* Close sits alone on the right; Clear All lives down in the
+                footer so a mis-tap can't wipe the history. */}
             <div className="flex justify-between items-center p-4 border-b border-gray-700">
               <h2 className={`text-lg font-bold ${theme.text}`}>Search History</h2>
-              <div className="flex gap-2">
-                {searchHistory.length > 0 && (
-                  <button
-                    onClick={clearHistory}
-                    className="text-red-400 text-sm hover:text-red-300"
-                  >
-                    Clear All
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowHistory(false)}
-                  className="text-gray-400 hover:text-white text-xl"
-                >
-                  &times;
-                </button>
-              </div>
+              <button
+                onClick={() => setShowHistory(false)}
+                className={`w-11 h-11 flex items-center justify-center rounded-full ${theme.bgTertiary} ${theme.textSecondary} hover:text-white text-2xl leading-none`}
+                aria-label="Close search history"
+              >
+                &times;
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -1470,6 +1498,17 @@ function App() {
                 </div>
               )}
             </div>
+
+            {searchHistory.length > 0 && (
+              <div className="border-t border-gray-700 p-3">
+                <button
+                  onClick={clearHistory}
+                  className="w-full py-3 rounded-lg text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                >
+                  Clear All History
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

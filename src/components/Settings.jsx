@@ -1,6 +1,9 @@
 import { themes, saveTheme } from '../lib/theme'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SwipeHandle from './SwipeHandle'
 
 function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, groupByName, onGroupByNameChange, appMode, onAppModeChange, dbStatus, onDownload, lastDbSyncLabel, onCheckForUpdate, checkingUpdate, buildTime }) {
+  const swipe = useSwipeToClose(onClose)
   function handleThemeClick(themeName) {
     saveTheme(themeName)
     onThemeChange(themeName)
@@ -24,9 +27,12 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
       onClick={onClose}
     >
       <div
-        className={`${theme.bgSecondary} rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6`}
+        className={`${theme.bgSecondary} rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 pt-2`}
         onClick={(e) => e.stopPropagation()}
+        style={swipe.swipeStyle}
+        {...swipe.swipeHandlers}
       >
+        <SwipeHandle />
         <div className="flex justify-between items-center mb-6">
           <h2 className={`text-xl font-bold ${theme.text}`}>Settings</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">

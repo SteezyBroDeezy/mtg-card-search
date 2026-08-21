@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { SEARCH_FILTERS } from '../lib/search'
+import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SwipeHandle from './SwipeHandle'
 
 function SearchHelp({ theme }) {
   const [isOpen, setIsOpen] = useState(false)
+  const swipe = useSwipeToClose(() => setIsOpen(false))
 
   const quickExamples = [
     { query: 't:creature c:red pow>=4', desc: 'Red creatures with 4+ power' },
@@ -35,12 +38,16 @@ function SearchHelp({ theme }) {
           <div
             className={`${theme.bgSecondary} rounded-xl max-w-3xl w-full max-h-[85vh] overflow-hidden`}
             onClick={(e) => e.stopPropagation()}
+            style={swipe.swipeStyle}
+            {...swipe.swipeHandlers}
           >
+            <SwipeHandle />
             <div className={`flex justify-between items-center p-4 border-b ${theme.border}`}>
               <h2 className="text-xl font-bold">Search Syntax Guide</h2>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-white text-2xl"
+                className="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20 text-gray-300 hover:text-white text-2xl leading-none"
+                aria-label="Close"
               >
                 &times;
               </button>
