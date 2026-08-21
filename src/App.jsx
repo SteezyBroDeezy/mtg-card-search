@@ -11,7 +11,7 @@ import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db } from './lib/db'
-import { downloadCards, syncNewCards } from './lib/scryfall'
+import { downloadCards, syncNewCards, syncNewCardsFromScryfall } from './lib/scryfall'
 import { parseSearch, matchesFilters } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
@@ -263,6 +263,8 @@ function App() {
       const info = await getDbInfo()
       setCardCount(info.cardCount)
       setDbStatus('ready')
+      // Auto-sync new cards from Scryfall when on WiFi (once per day)
+      syncNewCardsFromScryfall()
       // Don't call handleSearch here — its closure would still see
       // dbStatus='checking' and misroute the restored query to Scryfall.
       // The restore happens in the useEffect below, keyed on dbStatus.

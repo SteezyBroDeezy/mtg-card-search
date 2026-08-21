@@ -305,3 +305,84 @@ export async function syncNewCards(onProgress) {
   // Return the new total card count so callers can update UI state.
   return await db.cards.count()
 }
+
+// Search cards by oracle text or advanced Scryfall query
+export async function searchCardsByOracle(query) {
+  try {
+    const searchQuery = `o:"${query}"`
+    const response = await fetch(
+      `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(searchQuery)}&unique=cards&order=name`
+    )
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return [] // No cards found
+      }
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+    if (data.data && data.data.length > 0) {
+      return data.data.map(processCard).filter(Boolean)
+    }
+
+    return []
+  } catch (error) {
+    console.error('Oracle text search error:', error)
+    return []
+  }
+}
+
+// Auto-sync new cards from Scryfall when on WiFi (runs once per day)
+export async function syncNewCardsFromScryfall() {
+  try {
+    // Check if on WiFi or ethernet
+    const connection = navigator.connection
+    if (connection) {
+      const connectionType = connection.effectiveType || connection.type || ''
+      // Only sync on WiFi/ethernet (4g and 5g mean metered mobile)
+      if (connectionType === '4g' || connectionType === '5g' || connectionType === 'cellular') {
+        console.log('On mobile network, skipping auto-sync')
+        return
+      }
+    }
+
+    // Check last sync time
+    const lastSyncKey = 'mtg-last-card-sync'
+    const lastSync = localStorage.getItem(lastSyncKey)
+    const now = Date.now()
+    const oneDayMs = 24 * 60 * 60 * 1000
+
+    if (lastSync) {
+      const lastSyncTime = parseInt(lastSync, 10)
+      if (now - lastSyncTime < oneDayMs) {
+        console.log('Already synced today, skipping')
+        return
+      }
+    }
+
+    // Fetch latest cards from Scryfall (released in 2024+)
+    const query = `released>=2024-01-01 game:paper`
+    const searchUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=-released&per_page=20`
+
+    const response = await fetch(searchUrl)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+    if (data.data && data.data.length > 0) {
+      const cards = data.data.map(processCard).filter(Boolean)
+      if (cards.length > 0) {
+        // Store in IndexedDB
+        await db.cards.bulkPut(cards)
+        console.log(`Synced ${cards.length} new cards`)
+      }
+    }
+
+    // Update last sync time
+    localStorage.setItem(lastSyncKey, now.toString())
+  } catch (error) {
+    console.error('Auto-sync error:', error)
+  }
+}
