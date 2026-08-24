@@ -1,4 +1,44 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+// ---------------------------------------------------------------- scroll lock
+//
+// While any overlay is open the page behind it must not move. Without this,
+// a downward swipe that isn't consumed by the overlay chains through to the
+// document and scrolls the results grid underneath — so dismissing a card
+// left you somewhere else on the page.
+//
+// Overlays stack (card detail over quick view, save-to-list over card
+// detail), so the lock is reference-counted: the page is only released when
+// the last overlay closes.
+
+let lockCount = 0
+let savedScrollY = 0
+
+function lockBodyScroll() {
+  if (lockCount++ > 0) return
+  savedScrollY = window.scrollY
+  const body = document.body
+  body.style.position = 'fixed'
+  body.style.top = `-${savedScrollY}px`
+  body.style.left = '0'
+  body.style.right = '0'
+  body.style.width = '100%'
+  body.style.overflow = 'hidden'
+}
+
+function unlockBodyScroll() {
+  if (lockCount === 0) return
+  if (--lockCount > 0) return
+  const body = document.body
+  body.style.position = ''
+  body.style.top = ''
+  body.style.left = ''
+  body.style.right = ''
+  body.style.width = ''
+  body.style.overflow = ''
+  // position:fixed dropped the scroll position; put it back exactly.
+  window.scrollTo(0, savedScrollY)
+}
 
 /**
  * Drag-down-to-dismiss for overlays, the way native sheets behave.
@@ -8,13 +48,28 @@ import { useRef, useState } from 'react'
  * follows it; past `threshold` pixels it closes on release, otherwise it
  * springs back.
  *
+ * The gesture is contained to the overlay it started in: touch events are
+ * stopped from bubbling, so a sheet stacked on top of another sheet never
+ * drags the one behind it, and the page underneath is scroll-locked for as
+ * long as the overlay is open.
+ *
  * A drag is ignored when it starts inside a scrollable region that's already
- * scrolled down, so swiping through a long card list still scrolls normally.
+ * scrolled down, so swiping through a long card list still scrolls.
+ *
+ * `enabled` must be false when the component is mounted but its overlay is
+ * closed (SearchHelp renders its trigger button all the time), or the page
+ * would be locked permanently.
  */
-export function useSwipeToClose(onClose, { threshold = 110 } = {}) {
+export function useSwipeToClose(onClose, { threshold = 110, enabled = true } = {}) {
   const [dragY, setDragY] = useState(0)
   const [dragging, setDragging] = useState(false)
   const startRef = useRef(null)
+
+  useEffect(() => {
+    if (!enabled) return
+    lockBodyScroll()
+    return unlockBodyScroll
+  }, [enabled])
 
   function findScroller(node) {
     let el = node
@@ -27,7 +82,10 @@ export function useSwipeToClose(onClose, { threshold = 110 } = {}) {
   }
 
   function onTouchStart(e) {
-    if (e.touches.length !== 1) return
+    // Keep the gesture inside this overlay — a sheet on top of another sheet
+    // must not drag the one behind it.
+    e.stopPropagation()
+    if (!enabled || e.touches.length !== 1) return
     const touch = e.touches[0]
     const scroller = findScroller(e.target)
     // Mid-scroll: let the scroll win, don't start a dismiss drag.
@@ -36,6 +94,7 @@ export function useSwipeToClose(onClose, { threshold = 110 } = {}) {
   }
 
   function onTouchMove(e) {
+    e.stopPropagation()
     const start = startRef.current
     if (!start || e.touches.length !== 1) return
     const touch = e.touches[0]
@@ -65,7 +124,8 @@ export function useSwipeToClose(onClose, { threshold = 110 } = {}) {
     setDragY(dy > threshold ? threshold + (dy - threshold) * 0.35 : dy)
   }
 
-  function onTouchEnd() {
+  function onTouchEnd(e) {
+    e?.stopPropagation?.()
     const shouldClose = dragY > threshold
     startRef.current = null
     setDragging(false)
@@ -86,6 +146,7 @@ export function useSwipeToClose(onClose, { threshold = 110 } = {}) {
       opacity: dragY ? Math.max(0.4, 1 - dragY / 400) : undefined,
       transition: dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease',
       touchAction: 'pan-y',
+      overscrollBehavior: 'contain',
     },
   }
 }

@@ -10,8 +10,9 @@ import {
 } from '../lib/search'
  import { db } from '../lib/db'
   import { normalizeText } from '../lib/scryfall'
+import { FUN_SEARCHES, FUN_CATEGORIES, randomFunSearch } from '../lib/funSearches'
 
-function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false }) {
+function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false, offlineOnly = false, onFunSearch }) {
   const [query, setQuery] = useState(initialQuery)
   const [showHelper, setShowHelper] = useState(false)
   const [activeTab, setActiveTab] = useState('colors')
@@ -298,6 +299,22 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     setCustomType('')
   }
 
+  // Run one of the curated searches. Offline mode hides the ones that need
+  // Scryfall (regex, ~, is:vanilla) so a roll never lands on a dead query.
+  function runFunSearch(entry) {
+    setQuery(entry.query)
+    setShowSuggestions(false)
+    setShowHelper(false)
+    onFunSearch?.(entry)
+    // Flag the search so App keeps the blurb it was just handed.
+    onSearch(entry.query, { keepFunNote: true })
+  }
+
+  function rollSurprise() {
+    const entry = randomFunSearch(offlineOnly, query)
+    if (entry) runFunSearch(entry)
+  }
+
   function insertFilter(filterText) {
     const newQuery = query ? `${query} ${filterText}` : filterText
     setQuery(newQuery)
@@ -408,6 +425,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
   const tabs = [
     { id: 'colors', label: 'Colors' },
     { id: 'text', label: 'Card Text' },
+    { id: 'discover', label: '🎲 Discover' },
     { id: 'types', label: 'Types' },
     { id: 'stats', label: 'Stats' },
     { id: 'formats', label: 'Formats' },
@@ -644,6 +662,16 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           >
             <span>⚙️</span>
             <span>Filters</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={rollSurprise}
+            className={`flex-shrink-0 px-3 py-1.5 text-sm font-medium ${theme.bgTertiary} rounded-lg hover:opacity-90 transition-colors flex items-center gap-1`}
+            title="Run a random interesting search"
+          >
+            <span>🎲</span>
+            <span>Surprise Me</span>
           </button>
 
           {query && (
@@ -1181,6 +1209,69 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                     <button onClick={() => setEdhrecValue('1000')} className={`px-3 py-1 ${theme.bgSecondary} rounded text-sm`}>Top 1000</button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Discover Tab — curated searches worth knowing */}
+            {activeTab === 'discover' && (
+              <div className="space-y-4">
+                <div className={`p-3 ${theme.bgTertiary} rounded-lg flex items-center justify-between gap-3`}>
+                  <div>
+                    <p className={`${theme.text} font-medium mb-1`}>Searches worth knowing</p>
+                    <p className={`${theme.textSecondary} text-xs`}>
+                      Tap any of these to run it. The query lands in the search box, so
+                      you can see how it works and tweak it.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={rollSurprise}
+                    className={`flex-shrink-0 px-3 py-3 ${theme.accent} text-white rounded-lg text-sm font-medium`}
+                  >
+                    🎲 Roll
+                  </button>
+                </div>
+
+                <div className="max-h-[50vh] overflow-y-auto space-y-4">
+                  {FUN_CATEGORIES.map(category => {
+                    const entries = FUN_SEARCHES.filter(
+                      e => e.category === category && (!offlineOnly || e.offline)
+                    )
+                    if (entries.length === 0) return null
+                    return (
+                      <div key={category}>
+                        <p className={`${theme.text} font-semibold text-sm mb-2`}>{category}</p>
+                        <div className="space-y-2">
+                          {entries.map(entry => (
+                            <button
+                              key={entry.query}
+                              type="button"
+                              onClick={() => runFunSearch(entry)}
+                              className={`w-full text-left p-3 ${theme.bgTertiary} rounded-lg hover:bg-blue-600/30 transition-colors`}
+                            >
+                              <span className={`${theme.text} text-sm font-medium block`}>
+                                {entry.label}
+                              </span>
+                              <span className={`${theme.textSecondary} text-xs block mt-0.5`}>
+                                {entry.blurb}
+                              </span>
+                              <code className="text-blue-400 text-xs block mt-1 break-all">
+                                {entry.query}
+                              </code>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {offlineOnly && (
+                  <p className={`${theme.textSecondary} text-xs`}>
+                    A few searches that need the Scryfall API (regex, <code>~</code>,
+                    <code> is:vanilla</code>) are hidden while you're in offline mode.
+                  </p>
+                )}
               </div>
             )}
 

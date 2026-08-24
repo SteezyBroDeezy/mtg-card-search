@@ -5,7 +5,7 @@ import SwipeHandle from './SwipeHandle'
 
 function SearchHelp({ theme }) {
   const [isOpen, setIsOpen] = useState(false)
-  const swipe = useSwipeToClose(() => setIsOpen(false))
+  const swipe = useSwipeToClose(() => setIsOpen(false), { enabled: isOpen })
 
   const quickExamples = [
     { query: 't:creature c:red pow>=4', desc: 'Red creatures with 4+ power' },

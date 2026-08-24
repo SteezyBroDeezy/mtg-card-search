@@ -643,6 +643,14 @@ const SCRYFALL_ONLY_PATTERNS = [
   /^illustration:/i,   // Illustration ID
   /^flavor:/i,         // Flavor text
   /^lore:/i,           // Lore text
+  /^o:\//i,            // Regex oracle search: o:/^{T}:/
+  /^oracle:\//i,       // Regex oracle search (long form)
+  /^t:\//i,            // Regex type search
+  /^type:\//i,         // Regex type search (long form)
+  /^name:\//i,         // Regex name search
+  /^fo:/i,             // Full oracle (includes reminder text)
+  /^fulloracle:/i,     // Full oracle (long form)
+  /~/,                 // ~ is a placeholder for the card's own name
   /^is:reprint/i,      // Is reprint
   /^is:booster/i,      // In boosters
   /^is:promo/i,        // Promo cards
@@ -669,6 +677,9 @@ export function normalizeQuotes(query) {
     .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
 }
 
+// The is: properties checkFilterCondition can evaluate against a local card.
+const LOCAL_IS_PROPERTIES = new Set(['commander', 'dfc', 'reserved', 'spell', 'permanent'])
+
 // Values may arrive quoted (t:"legendary creature"); the quotes are syntax,
 // not part of what we match against.
 function unquote(value) {
@@ -681,16 +692,19 @@ export function parseSearch(rawQuery) {
   let nameSearch = ''
   let requiresScryfall = false
 
-  // Check if entire query contains Scryfall-only patterns
-  for (const pattern of SCRYFALL_ONLY_PATTERNS) {
-    if (pattern.test(query)) {
+  // Split by spaces, but keep quoted strings together
+  const parts = query.match(/(?:[^\s"]+|"[^"]*")+/g) || []
+
+  // Scryfall-only patterns are mostly ^-anchored, so they have to be tested
+  // against each token. Testing them against the whole query only ever
+  // caught the first one — `t:creature is:reprint` looked local.
+  for (const part of parts) {
+    const bare = part.startsWith('-') ? part.slice(1) : part
+    if (SCRYFALL_ONLY_PATTERNS.some(pattern => pattern.test(bare))) {
       requiresScryfall = true
       break
     }
   }
-
-  // Split by spaces, but keep quoted strings together
-  const parts = query.match(/(?:[^\s"]+|"[^"]*")+/g) || []
 
   for (const part of parts) {
     // Check for negation prefix
@@ -890,6 +904,13 @@ export function parseSearch(rawQuery) {
     else if (lower.startsWith('is:')) {
       const prop = unquote(lower.slice(3))
       filters.push({ type: 'is', value: prop, negated: isNegated })
+      // checkFilterCondition can only answer for these; every other property
+      // (is:vanilla, is:spell-land, …) has to come from Scryfall. Without
+      // this the local `is:` fell through to `return true` and matched the
+      // entire database.
+      if (!LOCAL_IS_PROPERTIES.has(prop)) {
+        requiresScryfall = true
+      }
     }
     // Otherwise it's a name search (negation doesn't apply to name search)
     else {
@@ -1082,7 +1103,9 @@ function checkFilterCondition(card, filter) {
         const isSorcery = card.type_line?.toLowerCase().includes('sorcery')
         return !(isInstant || isSorcery)
       }
-      return true
+      // Unknown property — parseSearch routes these to Scryfall, so reaching
+      // here means we can't evaluate it. Match nothing rather than everything.
+      return false
 
     case 'otag':
       // Use local pattern matching for oracle tags

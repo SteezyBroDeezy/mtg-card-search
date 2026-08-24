@@ -94,6 +94,7 @@ function App() {
   const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'color-wubrg' | 'rarity'
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
   const [showSortBar, setShowSortBar] = useState(false) // collapsed until asked for
+  const [funSearchNote, setFunSearchNote] = useState(null) // blurb for a curated search
 
   // PWA update handling. registerType is 'prompt', so needRefresh flips to
   // true when a newer build has downloaded and is waiting; nothing reloads
@@ -173,7 +174,7 @@ function App() {
   }
 
   // Pull-down-to-dismiss for the search history sheet.
-  const historySwipe = useSwipeToClose(() => setShowHistory(false))
+  const historySwipe = useSwipeToClose(() => setShowHistory(false), { enabled: showHistory })
 
   // How many result-level controls are active, shown on the collapsed toggle
   // so a filter can never be silently hiding cards.
@@ -533,7 +534,8 @@ function App() {
     }
   }
 
-  async function handleSearch(rawQuery) {
+  async function handleSearch(rawQuery, options = {}) {
+    if (!options.keepFunNote) setFunSearchNote(null)
     // Mobile keyboards produce curly quotes; fold them so phrase filters
     // like o:"whenever you gain life" work the same on phone and desktop.
     const query = normalizeQuotes(rawQuery)
@@ -1020,13 +1022,15 @@ function App() {
           <>
             <div className="mb-6">
               <SearchBar
-                onSearch={(q) => { setCurrentBrowsingSet(null); handleSearch(q); }}
+                onSearch={(q, opts) => { setCurrentBrowsingSet(null); handleSearch(q, opts); }}
                 theme={theme}
                 searchHistory={searchHistory}
                 onHistorySelect={rerunSearch}
                 initialQuery={lastQuery}
                 isSearching={isSearching}
                 useScryfallAutocomplete={appMode === 'online' || dbStatus !== 'ready'}
+                offlineOnly={appMode === 'offline' && dbStatus === 'ready'}
+                onFunSearch={(entry) => setFunSearchNote(entry)}
               />
               <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1114,6 +1118,23 @@ function App() {
                   className={`px-3 py-1.5 ${theme.bgTertiary} rounded-lg text-sm hover:opacity-80`}
                 >
                   ✕ Clear
+                </button>
+              </div>
+            )}
+
+            {funSearchNote && (
+              <div className={`${theme.bgSecondary} border ${theme.border} rounded-lg p-3 mb-4 flex items-start gap-3`}>
+                <span className="text-xl leading-none">🎲</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`${theme.text} font-medium text-sm`}>{funSearchNote.label}</p>
+                  <p className={`${theme.textSecondary} text-xs mt-0.5`}>{funSearchNote.blurb}</p>
+                </div>
+                <button
+                  onClick={() => setFunSearchNote(null)}
+                  className={`${theme.textSecondary} text-lg leading-none px-1`}
+                  aria-label="Dismiss"
+                >
+                  ×
                 </button>
               </div>
             )}

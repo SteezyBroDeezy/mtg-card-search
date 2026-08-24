@@ -422,3 +422,9 @@ html {
   .planet-orbit { transform: translate3d(60vw, 0, 0); }
   .comet { opacity: 0 !important; }
 }
+
+/* Stop scroll chaining: a swipe that reaches the end of a scrollable overlay
+   must not start scrolling the page behind it. */
+html, body {
+  overscroll-behavior-y: contain;
+}

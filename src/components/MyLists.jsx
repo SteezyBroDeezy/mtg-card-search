@@ -603,7 +603,12 @@ function MyLists({ userId, onClose, onCardClick }) {
       {mergeSource && (
         <div
           className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[60]"
-          onClick={() => !merging && closeMergeDialog()}
+          onClick={(e) => {
+            // This dialog is nested inside the lists backdrop; without
+            // stopping here, closing it would close My Lists too.
+            e.stopPropagation()
+            if (!merging) closeMergeDialog()
+          }}
         >
           <div
             className="bg-gray-800 rounded-xl p-6 max-w-md w-full"
@@ -714,7 +719,7 @@ function MyLists({ userId, onClose, onCardClick }) {
       {deleteConfirm && (
         <div
           className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[60]"
-          onClick={() => setDeleteConfirm(null)}
+          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null) }}
         >
           <div
             className="bg-gray-800 rounded-xl p-6 max-w-sm w-full text-center"
