@@ -706,6 +706,42 @@ export function toScryfallQuery(rawQuery) {
     .join(' ')
 }
 
+
+// Prefixes the parser understands as filter syntax. Used to tell a filter
+// query apart from a card name that merely contains a colon — 88 real cards
+// do, like "Avengers: Under Siege" and the "Bounty:" cycle.
+const FILTER_PREFIXES = [
+  'o', 'oracle', 'fo', 'fulloracle', 't', 'type', 'c', 'color', 'ci', 'id',
+  'cmc', 'mv', 'manavalue', 'pow', 'power', 'tou', 'toughness', 'loy',
+  'loyalty', 'r', 'rarity', 's', 'set', 'e', 'edition', 'b', 'block',
+  'f', 'format', 'legal', 'banned', 'restricted', 'a', 'artist', 'artists',
+  'k', 'kw', 'keyword', 'is', 'not', 'has', 'in', 'usd', 'eur', 'tix',
+  'year', 'date', 'edhrec', 'penny', 'produces', 'devotion', 'otag',
+  'oracletag', 'atag', 'art', 'function', 'cube', 'game', 'lang', 'new',
+  'order', 'prefer', 'unique', 'include', 'border', 'frame', 'stamp',
+  'watermark', 'illustration', 'ft', 'flavor', 'lore', 'name', 'm', 'mana',
+  'commander', 'st', 'number', 'cn', 'rarity',
+]
+
+const FILTER_TOKEN = new RegExp(
+  `(^|\\s)-?(${FILTER_PREFIXES.join('|')})[:=<>]`, 'i'
+)
+const COMPARISON_TOKEN = new RegExp(
+  `(^|\\s)-?(cmc|mv|manavalue|pow|power|tou|toughness|loy|loyalty|usd|eur|tix|year|date|edhrec|c|ci|id|colors|artists|illustrations)\\s*[<>=]`,
+  'i'
+)
+
+/**
+ * True when the text reads as a filter query rather than a card name.
+ *
+ * Checking for a bare ':' is not enough: it would classify "Avengers: Under
+ * Siege" as syntax and suppress its name suggestions.
+ */
+export function looksLikeFilterQuery(text) {
+  if (!text) return false
+  return FILTER_TOKEN.test(text) || COMPARISON_TOKEN.test(text)
+}
+
 export function parseSearch(rawQuery) {
   const query = normalizeQuotes(rawQuery)
   const filters = []

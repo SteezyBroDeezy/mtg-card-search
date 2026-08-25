@@ -11,6 +11,7 @@ import {
  import { db } from '../lib/db'
   import { normalizeText } from '../lib/scryfall'
 import { FUN_CATEGORIES, randomFunSearch, filterFunSearches } from '../lib/funSearches'
+import { looksLikeFilterQuery } from '../lib/search'
 
 function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false, offlineOnly = false, onFunSearch }) {
   const [query, setQuery] = useState(initialQuery)
@@ -93,19 +94,24 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
   // query-change effect below doesn't immediately re-open the dropdown
   // for the card name we just chose.
   const skipNextSuggestRef = useRef(false)
+  // Set by a paste so the dropdown opens even if focus wobbled.
+  const forceSuggestRef = useRef(false)
 
   // Fetch card name suggestions
   useEffect(() => {
     let cancelled = false
 
-    if (skipNextSuggestRef.current) {
+    if (skipNextSuggestRef.current && !forceSuggestRef.current) {
       skipNextSuggestRef.current = false
       return
     }
 
     const fetchSuggestions = async () => {
       const trimmed = query.trim()
-      if (!trimmed || trimmed.includes(':') || trimmed.includes('=') || trimmed.length < 2) {
+      // Only skip suggestions for actual filter syntax. Testing for a bare
+      // ':' also suppressed the 88 cards whose names contain one, such as
+      // "Avengers: Under Siege".
+      if (!trimmed || trimmed.length < 2 || looksLikeFilterQuery(trimmed)) {
         setSuggestions([])
         setShowSuggestions(false)
         return
@@ -223,6 +229,10 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         setSuggestions(out)
         setShowSuggestions(out.length > 0)
         setSelectedSuggestionIndex(-1)
+        if (forceSuggestRef.current) {
+          forceSuggestRef.current = false
+          inputRef.current?.focus()
+        }
       } catch (err) {
         if (cancelled) return
         console.error('Suggestion error:', err)
@@ -236,6 +246,38 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
       clearTimeout(debounce)
     }
   }, [query, useScryfallAutocomplete])
+
+  // Pasted text often arrives with decklist decoration around the name —
+  // "2x Sol Ring", "Sol Ring (LTC) 327". Strip that so the name still
+  // matches, and make sure the dropdown opens for it.
+  function cleanPastedName(text) {
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/^\s*\d+\s*[xX]?\s+/, '')
+      .replace(/\s*[([]\s*[A-Za-z0-9]{2,6}\s*[)\]]\s*[\d★p]*\s*$/i, '')
+      .trim()
+  }
+
+  function handlePaste(e) {
+    const text = e.clipboardData?.getData('text')
+    if (!text) return
+    e.preventDefault()
+    const cleaned = cleanPastedName(text)
+    // A paste replaces whatever was selected; with nothing selected it
+    // appends at the caret, same as typing.
+    const input = inputRef.current
+    const start = input?.selectionStart ?? query.length
+    const end = input?.selectionEnd ?? query.length
+    const next = query.slice(0, start) + cleaned + query.slice(end)
+    setQuery(next)
+    forceSuggestRef.current = true
+    // Keep the caret in the box so the dropdown isn't dismissed as a blur.
+    requestAnimationFrame(() => {
+      input?.focus()
+      const caret = start + cleaned.length
+      input?.setSelectionRange?.(caret, caret)
+    })
+  }
 
   function handleSuggestionClick(suggestion) {
     // suggestion can be object {displayName, searchName} or string (for backwards compatibility)
@@ -570,7 +612,14 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onBlur={() => setTimeout(() => {
+              // The paste callout on iOS briefly steals focus; only treat
+              // this as a real blur if focus actually landed elsewhere.
+              if (document.activeElement !== inputRef.current) {
+                setShowSuggestions(false)
+              }
+            }, 150)}
+            onPaste={handlePaste}
             placeholder="Search cards..."
             className={`w-full px-4 py-3 ${query ? 'pr-32' : 'pr-24'} ${theme.bgSecondary} border-2 ${theme.borderAccent || theme.border} rounded-lg focus:outline-none focus:ring-2 ${theme.ring || 'focus:ring-blue-500'} shadow-lg ${theme.glow || ''}`}
           />
