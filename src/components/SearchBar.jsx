@@ -10,7 +10,7 @@ import {
 } from '../lib/search'
  import { db } from '../lib/db'
   import { normalizeText } from '../lib/scryfall'
-import { FUN_SEARCHES, FUN_CATEGORIES, randomFunSearch } from '../lib/funSearches'
+import { FUN_CATEGORIES, randomFunSearch, filterFunSearches } from '../lib/funSearches'
 
 function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false, offlineOnly = false, onFunSearch }) {
   const [query, setQuery] = useState(initialQuery)
@@ -58,6 +58,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
   // Text filters
   const [customType, setCustomType] = useState('')
+  const [discoverFilter, setDiscoverFilter] = useState('')
   const [artistValue, setArtistValue] = useState('')
   const [oracleValue, setOracleValue] = useState('')
   const [setCode, setSetCode] = useState('')
@@ -309,6 +310,8 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     // Flag the search so App keeps the blurb it was just handed.
     onSearch(entry.query, { keepFunNote: true })
   }
+
+  const matchingSearches = filterFunSearches(discoverFilter, offlineOnly)
 
   function rollSurprise() {
     const entry = randomFunSearch(offlineOnly, query)
@@ -1219,8 +1222,8 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                   <div>
                     <p className={`${theme.text} font-medium mb-1`}>Searches worth knowing</p>
                     <p className={`${theme.textSecondary} text-xs`}>
-                      Tap any of these to run it. The query lands in the search box, so
-                      you can see how it works and tweak it.
+                      {matchingSearches.length} searches. Tap any to run it — the query lands
+                      in the search box, so you can see how it works and tweak it.
                     </p>
                   </div>
                   <button
@@ -1232,11 +1235,20 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                   </button>
                 </div>
 
+                <input
+                  type="text"
+                  value={discoverFilter}
+                  onChange={(e) => setDiscoverFilter(e.target.value)}
+                  placeholder="Filter these searches… (try 'ramp', 'draw', 'sacrifice')"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={`w-full px-3 py-3 text-base ${theme.bgTertiary} rounded-lg`}
+                />
+
                 <div className="max-h-[50vh] overflow-y-auto space-y-4">
                   {FUN_CATEGORIES.map(category => {
-                    const entries = FUN_SEARCHES.filter(
-                      e => e.category === category && (!offlineOnly || e.offline)
-                    )
+                    const entries = matchingSearches.filter(e => e.category === category)
                     if (entries.length === 0) return null
                     return (
                       <div key={category}>
@@ -1265,6 +1277,12 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                     )
                   })}
                 </div>
+
+                {matchingSearches.length === 0 && (
+                  <p className={`${theme.textSecondary} text-sm text-center py-4`}>
+                    Nothing matches "{discoverFilter}".
+                  </p>
+                )}
 
                 {offlineOnly && (
                   <p className={`${theme.textSecondary} text-xs`}>

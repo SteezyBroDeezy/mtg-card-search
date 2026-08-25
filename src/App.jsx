@@ -12,7 +12,7 @@ import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db } from './lib/db'
 import { downloadCards, syncNewCards, autoSyncNewCards } from './lib/scryfall'
-import { parseSearch, matchesFilters, normalizeQuotes } from './lib/search'
+import { parseSearch, matchesFilters, normalizeQuotes, toScryfallQuery } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import {
@@ -509,8 +509,10 @@ function App() {
   async function searchScryfall(query) {
     const SCRYFALL_API = 'https://api.scryfall.com'
     try {
+      // k: is our shorthand; Scryfall 400s on it and wants kw:.
+      const apiQuery = toScryfallQuery(query)
       const response = await fetch(
-        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards`
+        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(apiQuery)}&unique=cards`
       )
       const data = await response.json()
       if (data.object === 'error') {

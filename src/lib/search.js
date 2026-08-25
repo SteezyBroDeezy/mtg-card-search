@@ -686,6 +686,26 @@ function unquote(value) {
   return (value || '').replace(/"/g, '').trim()
 }
 
+/**
+ * Rewrite a query into something Scryfall's API accepts.
+ *
+ * Our search box documents `k:flying` for keywords, but Scryfall rejects
+ * `k:` with HTTP 400 — it wants `kw:` or `keyword:`. Sending it raw made
+ * every keyword search come back empty in online mode.
+ */
+export function toScryfallQuery(rawQuery) {
+  const query = normalizeQuotes(rawQuery)
+  const parts = query.match(/(?:[^\s"]+|"[^"]*")+/g) || []
+  return parts
+    .map(part => {
+      const neg = part.startsWith('-')
+      const bare = neg ? part.slice(1) : part
+      if (/^k:/i.test(bare)) return (neg ? '-' : '') + 'kw:' + bare.slice(2)
+      return part
+    })
+    .join(' ')
+}
+
 export function parseSearch(rawQuery) {
   const query = normalizeQuotes(rawQuery)
   const filters = []
@@ -890,9 +910,12 @@ export function parseSearch(rawQuery) {
       const artist = lower.slice(2).replace(/"/g, '')
       filters.push({ type: 'artist', value: artist, negated: isNegated })
     }
-    // Keyword filter: k:flying, k:deathtouch, etc.
-    else if (lower.startsWith('k:')) {
-      const keyword = lower.slice(2).replace(/"/g, '')
+    // Keyword filter: k:flying, kw:deathtouch, keyword:lifelink
+    // Scryfall only accepts kw:/keyword: — k: is our own shorthand — so all
+    // three are parsed here and k: is rewritten on the way out (see
+    // toScryfallQuery).
+    else if (lower.startsWith('k:') || lower.startsWith('kw:') || lower.startsWith('keyword:')) {
+      const keyword = unquote(lower.slice(lower.indexOf(':') + 1))
       filters.push({ type: 'keyword', value: keyword, negated: isNegated })
     }
     // Produces mana filter: produces:g, produces:any
