@@ -23,7 +23,7 @@ import {
   syncSearchHistory, clearRemoteHistory, loadLocalHistory, saveLocalHistory,
   getLastHistorySync, HISTORY_LIMIT
 } from './lib/historySync'
-import { sortCards, SORT_OPTIONS } from './lib/cardSort'
+import { sortCards, SORT_OPTIONS, DEFAULT_SORT } from './lib/cardSort'
 import { useSwipeToClose } from './lib/useSwipeToClose'
 import SwipeHandle from './components/SwipeHandle'
 import {
@@ -96,7 +96,8 @@ function App() {
   const [showSetsBrowser, setShowSetsBrowser] = useState(false)
   const [currentBrowsingSet, setCurrentBrowsingSet] = useState(null) // Track which set we're browsing
   const [flippedCards, setFlippedCards] = useState({}) // Track flipped state for DFCs on main grid
-  const [sortBy, setSortBy] = useState('default') // 'default' | 'name-asc' | 'name-desc' | 'price-desc' | 'price-asc' | 'cmc-asc' | 'cmc-desc' | 'color-wubrg' | 'rarity'
+  // Results come back most expensive first unless you pick something else.
+  const [sortBy, setSortBy] = useState(DEFAULT_SORT)
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
   const [showSortBar, setShowSortBar] = useState(false) // collapsed until asked for
   const [funSearchNote, setFunSearchNote] = useState(null) // blurb for a curated search
@@ -184,7 +185,7 @@ function App() {
   // How many result-level controls are active, shown on the collapsed toggle
   // so a filter can never be silently hiding cards.
   const activeResultFilterCount =
-    (sortBy !== 'default' ? 1 : 0) + typeFilter.length
+    (sortBy !== DEFAULT_SORT ? 1 : 0) + typeFilter.length
 
   // Result-list post-processing: sort + type filter applied after search.
   // The query DSL filters happen earlier in handleSearch; these are display-time controls.
@@ -219,7 +220,7 @@ function App() {
   }
 
   function resetResultFilters() {
-    setSortBy('default')
+    setSortBy(DEFAULT_SORT)
     setTypeFilter([])
   }
 
@@ -1253,7 +1254,7 @@ function App() {
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  {(sortBy !== 'default' || typeFilter.length > 0) && (
+                  {(sortBy !== DEFAULT_SORT || typeFilter.length > 0) && (
                     <button
                       onClick={resetResultFilters}
                       className={`px-2 py-1 ${theme.bgTertiary} text-xs rounded hover:opacity-80`}

@@ -1,8 +1,11 @@
 // Shared card-sort utilities used by the main search results and the saved
 // lists view. Keep both surfaces in sync by adding new options here.
 
+// What search results are sorted by until you choose otherwise.
+export const DEFAULT_SORT = 'price-desc'
+
 export const SORT_OPTIONS = [
-  { value: 'default', label: 'Default order' },
+  { value: 'default', label: 'Unsorted (as returned)' },
   { value: 'name-asc', label: 'Name A → Z' },
   { value: 'name-desc', label: 'Name Z → A' },
   { value: 'price-desc', label: 'Price (high → low)' },
