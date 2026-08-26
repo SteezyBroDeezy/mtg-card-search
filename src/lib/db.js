@@ -3,28 +3,18 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
-// Version 7 - Punctuation-insensitive name index, so "jace the" finds
-// "Jace, the Mind Sculptor". Unlike versions 5 and 6 this migrates the rows
-// in place instead of clearing them, so nobody has to re-download 32k cards
-// to get suggestions that ignore commas and hyphens.
+// Version 7 - Declares a name_search index for punctuation-insensitive
+// lookups. Deliberately does NOT backfill existing rows: rewriting 32k
+// records, each with a multi-entry word index, took long enough on a phone
+// to look like a hang. New cards get the field from processCard, and the
+// suggestion lookup does not depend on it — it derives the same result from
+// the name_words index plus a small in-memory filter, which needs no
+// migration at all.
 db.version(7).stores({
   cards: 'id, name, name_normalized, name_search, *name_words, flavor_name, flavor_name_normalized, flavor_name_search, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
   meta: 'key',
   lists: 'id, name, createdAt, updatedAt, synced',
   listCards: '[listId+cardId], listId, cardId, addedAt, synced'
-}).upgrade(tx => {
-  const flatten = (text) => (text || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/['\u2019\u2018`]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-
-  return tx.table('cards').toCollection().modify(card => {
-    card.name_search = flatten(card.name)
-    card.flavor_name_search = flatten(card.flavor_name)
-  })
 })
 
 // Version 6 - Added normalized name fields for fast indexed suggestion lookup
@@ -113,6 +103,22 @@ export function openDatabase(timeoutMs = 60000) {
   })
 
   return Promise.race([db.open(), timeout])
+}
+
+/**
+ * Last resort: delete the local database entirely.
+ *
+ * Only touches the offline card cache — lists and watchlists live in the
+ * account, so nothing synced is lost. The caller reloads afterwards and the
+ * app downloads the cards again.
+ */
+export async function resetDatabase() {
+  try {
+    db.close()
+  } catch {
+    // Already closed, or never opened.
+  }
+  await Dexie.delete('mtg-card-search')
 }
 
 // Check if database has cards

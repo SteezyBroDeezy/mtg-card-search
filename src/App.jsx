@@ -10,7 +10,7 @@ import PriceOracle from './components/PriceOracle'
 import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
-import { hasCards, getDbInfo, db, openDatabase } from './lib/db'
+import { hasCards, getDbInfo, db, openDatabase, resetDatabase } from './lib/db'
 import { downloadCards, syncNewCards, autoSyncNewCards } from './lib/scryfall'
 import { parseSearch, matchesFilters, normalizeQuotes, toScryfallQuery } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
@@ -415,6 +415,18 @@ function App() {
         handleDownload()
       }
     }
+  }
+
+  // Wipe the local card cache and start over. Lists live in the account, so
+  // this only costs a re-download.
+  async function handleResetDatabase() {
+    if (!window.confirm('Delete the offline card database and start over? Your lists are stored in your account and are not affected.')) return
+    try {
+      await resetDatabase()
+    } catch (error) {
+      console.error('Reset failed:', error)
+    }
+    window.location.reload()
   }
 
   // If checking drags on, explain why and offer a way past it.
@@ -1037,12 +1049,20 @@ function App() {
                   which can take a minute on a phone. If the app was open in
                   another tab or window, close it — that blocks the upgrade.
                 </p>
-                <button
-                  onClick={() => setAppMode('online')}
-                  className={`mt-3 px-4 py-2 ${theme.bgTertiary} ${theme.text} rounded-lg text-sm font-medium`}
-                >
-                  Use online mode instead
-                </button>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button
+                    onClick={() => setAppMode('online')}
+                    className={`px-4 py-2 ${theme.bgTertiary} ${theme.text} rounded-lg text-sm font-medium`}
+                  >
+                    Use online mode instead
+                  </button>
+                  <button
+                    onClick={handleResetDatabase}
+                    className="px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium"
+                  >
+                    Reset local database
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -1121,6 +1141,12 @@ function App() {
                 className="px-6 py-3 bg-gray-700 text-white rounded-lg font-medium"
               >
                 Use Online Mode
+              </button>
+              <button
+                onClick={handleResetDatabase}
+                className="px-6 py-3 bg-red-800 text-white rounded-lg font-medium"
+              >
+                Reset Local Database
               </button>
             </div>
           </div>

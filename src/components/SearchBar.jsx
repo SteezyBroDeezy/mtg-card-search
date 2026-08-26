@@ -174,11 +174,17 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             .startsWith(normalizedQuery)
             .limit(15)
             .toArray(),
+          // Punctuation-insensitive matching without needing a migrated
+          // index: prefix-match the first typed word against name_words
+          // (already indexed), then filter those candidates in memory by
+          // comparing full names with punctuation flattened. "jace the"
+          // matches "Jace, the Mind Sculptor" because the indexed word
+          // "jace," still starts with "jace".
           flatQuery
             ? db.cards
-                .where('name_search')
-                .startsWith(flatQuery)
-                .limit(15)
+                .where('name_words')
+                .startsWith(flatQuery.split(' ')[0])
+                .limit(400)
                 .toArray()
             : Promise.resolve([]),
           db.cards
@@ -208,10 +214,11 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
         // Priority 1.2: name matches once punctuation is ignored
         for (const card of flatMatches) {
-          if (!seen.has(card.name)) {
-            seen.add(card.name)
-            combined.push({ name: card.name, displayName: card.name, priority: 1.2 })
-          }
+          if (seen.has(card.name)) continue
+          const flatName = card.name_search || searchNormalize(card.name)
+          if (!flatName.startsWith(flatQuery)) continue
+          seen.add(card.name)
+          combined.push({ name: card.name, displayName: card.name, priority: 1.2 })
         }
 
         // Priority 1.5: flavor_name starts with query
