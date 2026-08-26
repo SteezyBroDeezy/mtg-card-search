@@ -2,6 +2,25 @@ import { db } from './db'
 
 const SCRYFALL_API = 'https://api.scryfall.com'
 
+  // Punctuation-insensitive form used for name suggestions.
+  //
+  // normalizeText below drops accents and apostrophes but keeps commas and
+  // hyphens, so "jace the" never prefix-matched "jace, the mind sculptor"
+  // offline. This flattens every non-alphanumeric character to a space, so
+  // typing a name without punctuation still finds it.
+  export function searchNormalize(text) {
+    if (!text) return ''
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/['\u2019\u2018`]/g, '')
+      .replace(/[\u00e6]/gi, 'ae')
+      .replace(/[\u0153]/gi, 'oe')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  }
+
   // Normalize text for indexed suggestion lookup.
   // Keep this in sync with the normalize used in SearchBar.jsx.
   export function normalizeText(text) {
@@ -24,8 +43,10 @@ function processCard(card) {
     name: card.name,
 flavor_name: card.flavor_name || '', // Secret Lair / Universe Beyond alternate names
   name_normalized: normalizeText(card.name),
+  name_search: searchNormalize(card.name),
   name_words: normalizeText(card.name).split(/\s+/).filter(Boolean),
   flavor_name_normalized: normalizeText(card.flavor_name || ''),
+  flavor_name_search: searchNormalize(card.flavor_name || ''),
     type_line: card.type_line || '',
     mana_cost: card.mana_cost || '',
     cmc: card.cmc || 0,

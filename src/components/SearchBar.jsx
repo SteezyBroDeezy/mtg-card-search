@@ -9,9 +9,10 @@ import {
   PROPERTY_OPTIONS
 } from '../lib/search'
  import { db } from '../lib/db'
-  import { normalizeText } from '../lib/scryfall'
+  import { normalizeText, searchNormalize } from '../lib/scryfall'
 import { FUN_CATEGORIES, randomFunSearch, filterFunSearches } from '../lib/funSearches'
 import { looksLikeFilterQuery } from '../lib/search'
+import { swallowNextClick } from '../lib/ghostClick'
 
 function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false, offlineOnly = false, onFunSearch }) {
   const [query, setQuery] = useState(initialQuery)
@@ -163,13 +164,23 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
       // Offline mode: indexed lookups against local Dexie DB. No table scans.
       try {
         const normalizedQuery = normalizeText(trimmed)
+        // Punctuation-insensitive form: "jace the" matches "Jace, the Mind
+        // Sculptor", "urzas saga" matches "Urza's Saga".
+        const flatQuery = searchNormalize(trimmed)
 
-        const [nameMatches, wordMatches, flavorMatches] = await Promise.all([
+        const [nameMatches, flatMatches, wordMatches, flavorMatches] = await Promise.all([
           db.cards
             .where('name_normalized')
             .startsWith(normalizedQuery)
             .limit(15)
             .toArray(),
+          flatQuery
+            ? db.cards
+                .where('name_search')
+                .startsWith(flatQuery)
+                .limit(15)
+                .toArray()
+            : Promise.resolve([]),
           db.cards
             .where('name_words')
             .startsWith(normalizedQuery)
@@ -192,6 +203,14 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           if (!seen.has(card.name)) {
             seen.add(card.name)
             combined.push({ name: card.name, displayName: card.name, priority: 1 })
+          }
+        }
+
+        // Priority 1.2: name matches once punctuation is ignored
+        for (const card of flatMatches) {
+          if (!seen.has(card.name)) {
+            seen.add(card.name)
+            combined.push({ name: card.name, displayName: card.name, priority: 1.2 })
           }
         }
 
@@ -287,6 +306,9 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     // suggestion fetcher and pop the dropdown right back open. Skip the
     // next run.
     skipNextSuggestRef.current = true
+    // We acted on pointerdown; kill the click that follows so it can't land
+    // on a card tile or button that just moved under the finger.
+    swallowNextClick()
     setQuery(displayName)
     setSuggestions([])
     setShowSuggestions(false)

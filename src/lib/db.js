@@ -3,6 +3,30 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
+// Version 7 - Punctuation-insensitive name index, so "jace the" finds
+// "Jace, the Mind Sculptor". Unlike versions 5 and 6 this migrates the rows
+// in place instead of clearing them, so nobody has to re-download 32k cards
+// to get suggestions that ignore commas and hyphens.
+db.version(7).stores({
+  cards: 'id, name, name_normalized, name_search, *name_words, flavor_name, flavor_name_normalized, flavor_name_search, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
+  meta: 'key',
+  lists: 'id, name, createdAt, updatedAt, synced',
+  listCards: '[listId+cardId], listId, cardId, addedAt, synced'
+}).upgrade(tx => {
+  const flatten = (text) => (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['\u2019\u2018`]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+  return tx.table('cards').toCollection().modify(card => {
+    card.name_search = flatten(card.name)
+    card.flavor_name_search = flatten(card.flavor_name)
+  })
+})
+
 // Version 6 - Added normalized name fields for fast indexed suggestion lookup
 db.version(6).stores({
   cards: 'id, name, name_normalized, *name_words, flavor_name, flavor_name_normalized, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',

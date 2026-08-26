@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { swallowNextClick } from './ghostClick'
 
 // ---------------------------------------------------------------- scroll lock
 //
@@ -130,7 +131,12 @@ export function useSwipeToClose(onClose, { threshold = 110, enabled = true } = {
     startRef.current = null
     setDragging(false)
     setDragY(0)
-    if (shouldClose) onClose?.()
+    if (shouldClose) {
+      // The overlay is about to vanish; don't let the trailing click reach
+      // whatever ends up under the finger.
+      swallowNextClick()
+      onClose?.()
+    }
   }
 
   return {
