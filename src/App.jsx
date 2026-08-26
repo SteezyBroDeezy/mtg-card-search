@@ -19,6 +19,10 @@ import {
   loadEffectLayers, saveEffectLayers, loadIntensity, saveIntensity
 } from './lib/effects'
 import { syncLists, hasUnsyncedChanges, getLastSyncTime } from './lib/listSync'
+import {
+  syncSearchHistory, clearRemoteHistory, loadLocalHistory, saveLocalHistory,
+  getLastHistorySync, HISTORY_LIMIT
+} from './lib/historySync'
 import { sortCards, SORT_OPTIONS } from './lib/cardSort'
 import { useSwipeToClose } from './lib/useSwipeToClose'
 import SwipeHandle from './components/SwipeHandle'
@@ -71,11 +75,12 @@ function App() {
   // the theme ships with, 'custom' stacks the chosen layers over any theme.
   const [effectConfig, setEffectConfig] = useState(loadEffectLayers)
   const [effectIntensity, setEffectIntensity] = useState(loadIntensity)
-  const [searchHistory, setSearchHistory] = useState(() => {
-    // Load from localStorage for non-logged-in users
-    const saved = localStorage.getItem('mtg-search-history')
-    return saved ? JSON.parse(saved) : []
-  })
+  // History lives in localStorage so it works signed-out and offline; the
+  // sync button merges it with the account copy across devices.
+  const [searchHistory, setSearchHistory] = useState(loadLocalHistory)
+  const [historySyncing, setHistorySyncing] = useState(false)
+  const [historySyncNote, setHistorySyncNote] = useState(null)
+  const [lastHistorySync, setLastHistorySync] = useState(getLastHistorySync)
   const [showHistory, setShowHistory] = useState(false)
   const [groupByName, setGroupByName] = useState(() => {
     const saved = localStorage.getItem('mtg-group-by-name')
@@ -250,10 +255,16 @@ function App() {
     setSyncing(true)
     try {
       // Sync both lists AND price oracle data
-      const [listResult, priceResult] = await Promise.all([
+      const [listResult, priceResult, historyResult] = await Promise.all([
         syncLists(user.uid),
-        syncPriceOracle(user.uid)
+        syncPriceOracle(user.uid),
+        syncSearchHistory(user.uid, searchHistory)
       ])
+
+      if (historyResult.success) {
+        setSearchHistory(historyResult.history)
+        setLastHistorySync(getLastHistorySync())
+      }
 
       if (listResult.success && priceResult.success) {
         await checkSyncStatus()
@@ -296,7 +307,7 @@ function App() {
 
   // Save search history to localStorage
   useEffect(() => {
-    localStorage.setItem('mtg-search-history', JSON.stringify(searchHistory.slice(0, 20)))
+    saveLocalHistory(searchHistory)
   }, [searchHistory])
 
   function addToHistory(query, resultCount) {
@@ -309,13 +320,38 @@ function App() {
     setSearchHistory(prev => {
       // Remove duplicate if exists
       const filtered = prev.filter(h => h.query !== query)
-      return [entry, ...filtered].slice(0, 20)
+      return [entry, ...filtered].slice(0, HISTORY_LIMIT)
     })
   }
 
   function clearHistory() {
     setSearchHistory([])
-    localStorage.removeItem('mtg-search-history')
+    saveLocalHistory([])
+    // Without this the next sync would pull the cleared entries right back.
+    if (user) clearRemoteHistory(user.uid)
+    setHistorySyncNote(null)
+  }
+
+  async function handleHistorySync() {
+    if (!user || historySyncing) return
+    setHistorySyncing(true)
+    setHistorySyncNote(null)
+    try {
+      const result = await syncSearchHistory(user.uid, searchHistory)
+      if (result.success) {
+        setSearchHistory(result.history)
+        setLastHistorySync(getLastHistorySync())
+        setHistorySyncNote(
+          result.added > 0
+            ? `Pulled in ${result.added} search${result.added === 1 ? '' : 'es'} from your other devices`
+            : 'Already up to date on every device'
+        )
+      } else {
+        setHistorySyncNote('Sync failed: ' + result.error)
+      }
+    } finally {
+      setHistorySyncing(false)
+    }
   }
 
   function rerunSearch(query) {
@@ -1500,7 +1536,14 @@ function App() {
             {/* Close sits alone on the right; Clear All lives down in the
                 footer so a mis-tap can't wipe the history. */}
             <div className="flex justify-between items-center p-4 border-b border-gray-700">
-              <h2 className={`text-lg font-bold ${theme.text}`}>Search History</h2>
+              <div className="min-w-0">
+                <h2 className={`text-lg font-bold ${theme.text}`}>Search History</h2>
+                <p className={`${theme.textSecondary} text-xs mt-0.5`}>
+                  {user
+                    ? `Synced ${lastHistorySync ? formatTimeAgo(new Date(lastHistorySync).getTime()) : 'never'}`
+                    : 'On this device only'}
+                </p>
+              </div>
               <button
                 onClick={() => setShowHistory(false)}
                 className={`w-11 h-11 flex items-center justify-center rounded-full ${theme.bgTertiary} ${theme.textSecondary} hover:text-white text-2xl leading-none`}
@@ -1508,6 +1551,29 @@ function App() {
               >
                 &times;
               </button>
+            </div>
+
+            <div className="p-3 border-b border-gray-700 space-y-2">
+              {user ? (
+                <button
+                  onClick={handleHistorySync}
+                  disabled={historySyncing}
+                  className={`w-full py-3 rounded-lg text-sm font-medium ${theme.accent} text-white disabled:opacity-60 flex items-center justify-center gap-2`}
+                >
+                  <span className={historySyncing ? 'animate-spin' : ''}>⟳</span>
+                  {historySyncing ? 'Syncing…' : 'Sync History Across Devices'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setShowHistory(false); setShowAuth(true) }}
+                  className={`w-full py-3 rounded-lg text-sm font-medium ${theme.bgTertiary} ${theme.text}`}
+                >
+                  Sign in to sync history across devices
+                </button>
+              )}
+              {historySyncNote && (
+                <p className={`${theme.textSecondary} text-xs text-center`}>{historySyncNote}</p>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto">
