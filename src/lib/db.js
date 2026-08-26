@@ -76,6 +76,45 @@ db.version(1).stores({
   meta: 'key'
 })
 
+// An IndexedDB version change needs every other connection closed first.
+// Without these handlers a second tab left open at the old version blocks the
+// upgrade forever, and the app sits on "Checking database" with no way out.
+db.on('blocked', () => {
+  console.warn('Database upgrade blocked by another open tab')
+})
+
+// Another tab is upgrading: let go so it can proceed.
+db.on('versionchange', () => {
+  console.warn('Database version change requested elsewhere; closing this connection')
+  db.close()
+})
+
+/**
+ * Open the database, failing loudly instead of hanging.
+ *
+ * Rejects with a tagged error so the caller can tell "another tab is holding
+ * it open" apart from a genuine failure.
+ */
+export function openDatabase(timeoutMs = 60000) {
+  let blocked = false
+  const onBlocked = () => { blocked = true }
+  db.on('blocked', onBlocked)
+
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => {
+      const error = new Error(
+        blocked
+          ? 'Database upgrade is waiting on another open tab or window.'
+          : 'Database took too long to open.'
+      )
+      error.code = blocked ? 'blocked' : 'timeout'
+      reject(error)
+    }, timeoutMs)
+  })
+
+  return Promise.race([db.open(), timeout])
+}
+
 // Check if database has cards
 export async function hasCards() {
   const count = await db.cards.count()

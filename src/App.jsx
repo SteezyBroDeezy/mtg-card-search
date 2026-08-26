@@ -10,7 +10,7 @@ import PriceOracle from './components/PriceOracle'
 import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
-import { hasCards, getDbInfo, db } from './lib/db'
+import { hasCards, getDbInfo, db, openDatabase } from './lib/db'
 import { downloadCards, syncNewCards, autoSyncNewCards } from './lib/scryfall'
 import { parseSearch, matchesFilters, normalizeQuotes, toScryfallQuery } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
@@ -50,6 +50,8 @@ function App() {
   // When the card DB was last refreshed, and a transient banner describing
   // the result of the most recent update.
   const [lastDbSync, setLastDbSync] = useState(null)
+  const [dbError, setDbError] = useState(null)
+  const [checkingSlow, setCheckingSlow] = useState(false)
   const [syncNotice, setSyncNotice] = useState(null)
   // 'online' = query Scryfall API live, no DB needed.
   // 'offline' = use local IndexedDB. PWA defaults to offline; web defaults to online.
@@ -369,6 +371,23 @@ function App() {
   }
 
   async function checkDatabase() {
+    // Opening can hang: an IndexedDB upgrade waits on every other connection
+    // to close, so a second tab left open blocks it indefinitely. Fail into a
+    // state the user can act on rather than sitting on "Checking database".
+    try {
+      await openDatabase()
+    } catch (error) {
+      console.error('Database open failed:', error)
+      setDbError(
+        error.code === 'blocked'
+          ? 'Another tab or window has the app open, which blocks the database upgrade. Close the others, then retry.'
+          : 'The local database did not open. You can retry, or use online mode.'
+      )
+      setDbStatus('error')
+      return
+    }
+
+    setDbError(null)
     const exists = await hasCards()
     if (exists) {
       const info = await getDbInfo()
@@ -397,6 +416,16 @@ function App() {
       }
     }
   }
+
+  // If checking drags on, explain why and offer a way past it.
+  useEffect(() => {
+    if (dbStatus !== 'checking') {
+      setCheckingSlow(false)
+      return
+    }
+    const timer = setTimeout(() => setCheckingSlow(true), 6000)
+    return () => clearTimeout(timer)
+  }, [dbStatus])
 
   // Restore the last search once we know the DB and mode are settled.
   // Runs once on first transition into a usable state.
@@ -999,7 +1028,24 @@ function App() {
 
         {/* Regular Search View */}
         {!showPriceOracle && dbStatus === 'checking' && (
-          <div className={theme.textSecondary}>Checking database...</div>
+          <div className={`${theme.bgSecondary} rounded-lg p-4 mb-6`}>
+            <p className={theme.text}>Checking database...</p>
+            {checkingSlow && (
+              <>
+                <p className={`${theme.textSecondary} text-sm mt-2`}>
+                  Still working. A version upgrade rewrites the card index once,
+                  which can take a minute on a phone. If the app was open in
+                  another tab or window, close it — that blocks the upgrade.
+                </p>
+                <button
+                  onClick={() => setAppMode('online')}
+                  className={`mt-3 px-4 py-2 ${theme.bgTertiary} ${theme.text} rounded-lg text-sm font-medium`}
+                >
+                  Use online mode instead
+                </button>
+              </>
+            )}
+          </div>
         )}
 
         {/* Offline-mode-only welcome / download / error screens.
@@ -1053,13 +1099,30 @@ function App() {
 
         {!showPriceOracle && appMode === 'offline' && dbStatus === 'error' && (
           <div className="bg-red-900 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-2">Download Failed</h2>
-            <button
-              onClick={handleDownload}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium"
-            >
-              Retry
-            </button>
+            <h2 className="text-xl font-semibold mb-2">
+              {dbError ? 'Database Unavailable' : 'Download Failed'}
+            </h2>
+            {dbError && <p className="text-red-100 text-sm mb-4">{dbError}</p>}
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => { setDbStatus('checking'); checkDatabase() }}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium"
+              >
+                Retry
+              </button>
+              <button
+                onClick={handleDownload}
+                className="px-6 py-3 bg-red-700 text-white rounded-lg font-medium"
+              >
+                Re-download Database
+              </button>
+              <button
+                onClick={() => setAppMode('online')}
+                className="px-6 py-3 bg-gray-700 text-white rounded-lg font-medium"
+              >
+                Use Online Mode
+              </button>
+            </div>
           </div>
         )}
 
