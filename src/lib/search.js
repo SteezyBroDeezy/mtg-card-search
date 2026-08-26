@@ -687,23 +687,39 @@ function unquote(value) {
 }
 
 /**
- * Rewrite a query into something Scryfall's API accepts.
+ * Rewrite a query into something Scryfall's API accepts, and pin which
+ * printing it returns.
  *
- * Our search box documents `k:flying` for keywords, but Scryfall rejects
- * `k:` with HTTP 400 — it wants `kw:` or `keyword:`. Sending it raw made
- * every keyword search come back empty in online mode.
+ * Two adjustments:
+ *
+ * 1. Our search box documents `k:flying` for keywords, but Scryfall rejects
+ *    `k:` with HTTP 400 — it wants `kw:` or `keyword:`. Sending it raw made
+ *    every keyword search come back empty in online mode.
+ *
+ * 2. `unique=cards` collapses a card's printings down to one, and left to
+ *    itself Scryfall may hand back an MTGO-only printing that carries no USD
+ *    price — Deranged Hermit resolved to Vintage Masters (tix only, no usd)
+ *    while the offline database held Urza's Legacy at $87.94. `prefer:usd-low`
+ *    picks the cheapest priced printing instead, which both fixes the missing
+ *    prices and matches what the offline database and the group-by-name
+ *    setting already promise. Unlike `game:paper` it excludes nothing, so
+ *    searching an MTGO-only set still returns its cards.
  */
 export function toScryfallQuery(rawQuery) {
   const query = normalizeQuotes(rawQuery)
   const parts = query.match(/(?:[^\s"]+|"[^"]*")+/g) || []
-  return parts
-    .map(part => {
-      const neg = part.startsWith('-')
-      const bare = neg ? part.slice(1) : part
-      if (/^k:/i.test(bare)) return (neg ? '-' : '') + 'kw:' + bare.slice(2)
-      return part
-    })
-    .join(' ')
+  const rewritten = parts.map(part => {
+    const neg = part.startsWith('-')
+    const bare = neg ? part.slice(1) : part
+    if (/^k:/i.test(bare)) return (neg ? '-' : '') + 'kw:' + bare.slice(2)
+    return part
+  })
+
+  // Respect an explicit choice rather than fighting it.
+  const hasPreference = rewritten.some(p => /^-?(prefer|unique):/i.test(p))
+  if (!hasPreference) rewritten.push('prefer:usd-low')
+
+  return rewritten.join(' ')
 }
 
 

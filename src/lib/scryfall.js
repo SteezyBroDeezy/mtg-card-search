@@ -112,9 +112,12 @@ export async function downloadCards(onProgress) {
   // Clear existing cards
   await db.cards.clear()
 
-  // We'll fetch all unique cards using search API with pagination
-  // Using "game:paper" to get paper cards, unique:cards for one per name
-  let nextUrl = `${SCRYFALL_API}/cards/search?q=game%3Apaper&unique=cards&order=name`
+  // We'll fetch all unique cards using search API with pagination.
+  // game:paper keeps out MTGO/Arena-only printings, unique:cards gives one
+  // per name, and prefer:usd-low decides *which* one — without it Scryfall
+  // returns an arbitrary printing, which is why the same card could show a
+  // different price offline than online.
+  let nextUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent('game:paper prefer:usd-low')}&unique=cards&order=name`
   let totalSaved = 0
   let pageNum = 0
   // Initial estimate; refined from data.total_cards on the first response
@@ -228,7 +231,9 @@ export async function syncNewCards(onProgress) {
   })
 
   const countBefore = cardCount
-  const query = `game:paper date>=${sinceStr}`
+  // Same printing preference as the full download, so incremental syncs
+  // don't reintroduce the mismatch.
+  const query = `game:paper prefer:usd-low date>=${sinceStr}`
   let nextUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
   let totalUpdated = 0
   let pageNum = 0
