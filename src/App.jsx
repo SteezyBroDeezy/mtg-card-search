@@ -542,30 +542,49 @@ function App() {
   }
 
   // Search Scryfall API directly (for otag: and other API-only features)
+  // Same ceiling the local database search uses, so both modes return the
+  // same amount of a large result set.
+  const SEARCH_RESULT_LIMIT = 500
+
   async function searchScryfall(query) {
     const SCRYFALL_API = 'https://api.scryfall.com'
+
+    const shapeCard = (card) => ({
+      ...card,
+      image_small: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small,
+      image_normal: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal,
+      image_large: card.image_uris?.large || card.card_faces?.[0]?.image_uris?.large,
+      image_art_crop: card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop
+    })
+
     try {
       // k: is our shorthand; Scryfall 400s on it and wants kw:.
       const apiQuery = toScryfallQuery(query)
-      const response = await fetch(
-        `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(apiQuery)}&unique=cards`
-      )
-      const data = await response.json()
-      if (data.object === 'error') {
-        console.error('Scryfall error:', data.details)
-        return []
+      let url = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(apiQuery)}&unique=cards`
+      const results = []
+
+      // Scryfall pages at 175 cards. Reading only the first page meant a
+      // broad search silently stopped there — t:elf has 706 matches, so
+      // cards like Prowess of the Fair never appeared online while the
+      // local database (limit 500) found them fine.
+      while (url && results.length < SEARCH_RESULT_LIMIT) {
+        const response = await fetch(url)
+        const data = await response.json()
+
+        if (data.object === 'error') {
+          // A 404 on the first page just means nothing matched.
+          if (results.length === 0) console.error('Scryfall error:', data.details)
+          break
+        }
+
+        if (Array.isArray(data.data)) results.push(...data.data.map(shapeCard))
+
+        url = data.has_more && data.next_page ? data.next_page : null
+        // Scryfall asks for 50-100ms between requests.
+        if (url) await new Promise(resolve => setTimeout(resolve, 100))
       }
-      if (data.data) {
-        // Transform Scryfall results to match our local card format
-        return data.data.map(card => ({
-          ...card,
-          image_small: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small,
-          image_normal: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal,
-          image_large: card.image_uris?.large || card.card_faces?.[0]?.image_uris?.large,
-          image_art_crop: card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop
-        }))
-      }
-      return []
+
+      return results.slice(0, SEARCH_RESULT_LIMIT)
     } catch (err) {
       console.error('Scryfall API error:', err)
       return []
