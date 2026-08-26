@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SyncListsButton from './SyncListsButton'
 import SwipeHandle from './SwipeHandle'
 import SaveToListModal from './SaveToListModal'
 import {
@@ -8,7 +9,7 @@ import {
   removeFromWatchlistCached
 } from '../lib/priceOracleCache'
 
-function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, theme, onListUpdated }) {
+function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, theme, onListUpdated, syncing, hasUnsynced, onSyncLists }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [currentFace, setCurrentFace] = useState(0)
   const [isFlipping, setIsFlipping] = useState(false)
@@ -137,6 +138,16 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
           <SwipeHandle />
           <div className="flex justify-between items-center p-3 sm:p-4 border-b border-gray-700 sticky top-0 bg-gray-800 z-10">
             <h2 className="text-lg sm:text-xl font-bold truncate pr-2">{card.name}</h2>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Sticky header, so this stays reachable however far you
+                  scroll through printings. */}
+              <SyncListsButton
+                user={user}
+                syncing={syncing}
+                hasUnsynced={hasUnsynced}
+                onSync={onSyncLists}
+                theme={theme}
+              />
             <button
               onClick={onClose}
               className="w-11 h-11 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20 text-gray-300 hover:text-white text-2xl leading-none flex-shrink-0"
@@ -144,6 +155,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
             >
               &times;
             </button>
+            </div>
           </div>
 
           <div className="p-3 sm:p-4 flex flex-col lg:flex-row gap-4 sm:gap-6">
@@ -515,6 +527,10 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
       {showSaveModal && (
         <SaveToListModal
           card={card}
+          user={user}
+          syncing={syncing}
+          hasUnsynced={hasUnsynced}
+          onSyncLists={onSyncLists}
           userId={user.uid}
           onClose={() => {
             setShowSaveModal(false)

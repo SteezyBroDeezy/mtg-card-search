@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SyncListsButton from './SyncListsButton'
 import {
   isInWatchlistCached,
   addToWatchlistCached,
   removeFromWatchlistCached
 } from '../lib/priceOracleCache'
 
-function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList }) {
+function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList, syncing, hasUnsynced, onSyncLists }) {
   const [inWatchlist, setInWatchlist] = useState(false)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
   const [currentFace, setCurrentFace] = useState(0)
@@ -193,13 +194,23 @@ function QuickCardView({ card, user, theme, onClose, onViewDetails, onSaveToList
           </button>
         </div>
 
-        {/* View details button */}
-        <button
-          onClick={onViewDetails}
-          className="w-full py-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-xl font-medium transition-colors"
-        >
-          View All Details & Printings
-        </button>
+        {/* View details, with sync alongside so a card saved just now can be
+            pushed without leaving the overlay. */}
+        <div className="flex gap-3">
+          <button
+            onClick={onViewDetails}
+            className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-xl font-medium transition-colors"
+          >
+            View All Details
+          </button>
+          <SyncListsButton
+            user={user}
+            syncing={syncing}
+            hasUnsynced={hasUnsynced}
+            onSync={onSyncLists}
+            theme={theme}
+          />
+        </div>
       </div>
     </div>
   )

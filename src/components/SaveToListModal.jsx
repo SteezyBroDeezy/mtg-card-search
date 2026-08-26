@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
+import SyncListsButton from './SyncListsButton'
 import {
   getLocalLists,
   createListLocal,
   addCardToListLocal
 } from '../lib/listSync'
 
-function SaveToListModal({ card, userId, onClose, theme }) {
+function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsynced, onSyncLists }) {
   const [lists, setLists] = useState([])
   const [loading, setLoading] = useState(true)
   const [newListName, setNewListName] = useState('')
@@ -65,7 +66,9 @@ function SaveToListModal({ card, userId, onClose, theme }) {
     try {
       await addCardToListLocal(selectedList, card, note)
       setSaved(true)
-      setTimeout(() => onClose(), 800) // Brief success state before closing
+      // Longer than the old 800ms so the sync button below is actually
+      // reachable after a save.
+      setTimeout(() => onClose(), 2000)
     } catch (err) {
       console.error('Failed to save card:', err)
       alert('Failed to save card')
@@ -232,9 +235,18 @@ function SaveToListModal({ card, userId, onClose, theme }) {
               {saving ? 'Saving...' : selectedList ? 'Save to List' : 'Select a List'}
             </button>
 
-            <p className={`${textSecondary} text-xs text-center mt-3`}>
-              Saved locally • Sync to push to cloud
-            </p>
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <p className={`${textSecondary} text-xs`}>
+                Saved locally
+              </p>
+              <SyncListsButton
+                user={user}
+                syncing={syncing}
+                hasUnsynced={hasUnsynced}
+                onSync={onSyncLists}
+                theme={theme}
+              />
+            </div>
           </div>
         )}
       </div>

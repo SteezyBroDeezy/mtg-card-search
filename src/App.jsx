@@ -1464,6 +1464,9 @@ function App() {
           onClose={() => setQuickViewCard(null)}
           onViewDetails={() => handleViewFullDetails(quickViewCard)}
           onSaveToList={() => setShowQuickSaveModal(true)}
+          syncing={syncing}
+          hasUnsynced={hasUnsynced}
+          onSyncLists={handleListSync}
         />
       )}
 
@@ -1477,6 +1480,10 @@ function App() {
             checkSyncStatus()
           }}
           theme={theme}
+          user={user}
+          syncing={syncing}
+          hasUnsynced={hasUnsynced}
+          onSyncLists={handleListSync}
         />
       )}
 
@@ -1501,6 +1508,9 @@ function App() {
           user={user}
           theme={theme}
           onListUpdated={checkSyncStatus}
+          syncing={syncing}
+          hasUnsynced={hasUnsynced}
+          onSyncLists={handleListSync}
         />
       )}
 
