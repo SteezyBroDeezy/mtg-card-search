@@ -14,6 +14,7 @@ import { hasCards, getDbInfo, db, openDatabase, resetDatabase } from './lib/db'
 import { downloadCards, syncNewCards, autoSyncNewCards, resolveFlavorName } from './lib/scryfall'
 import { parseSearch, normalizeQuotes, toScryfallQuery } from './lib/search'
 import { searchLocal, clearSearchCache } from './lib/localSearch'
+import { refreshPrices } from './lib/priceRefresh'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import {
@@ -103,6 +104,7 @@ function App() {
   const [sortBy, setSortBy] = useState(DEFAULT_SORT)
   const [typeFilter, setTypeFilter] = useState([]) // subset of CARD_TYPES; empty = no filter
   const [showSortBar, setShowSortBar] = useState(false) // collapsed until asked for
+  const [pricesRefreshing, setPricesRefreshing] = useState(false)
   const [funSearchNote, setFunSearchNote] = useState(null) // blurb for a curated search
 
   // PWA update handling. registerType is 'prompt', so needRefresh flips to
@@ -439,6 +441,46 @@ function App() {
     const timer = setTimeout(() => setCheckingSlow(true), 6000)
     return () => clearTimeout(timer)
   }, [dbStatus])
+
+  // Offline results carry whatever prices were stored at download time, and
+  // those drift. Refresh just the cards on screen — one request per 75 —
+  // rather than making the user re-download the database for fresh numbers.
+  useEffect(() => {
+    if (searchSource !== 'local' && searchSource !== 'local-scan') return
+    if (!navigator.onLine || displayedResults.length === 0) return
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const updates = await refreshPrices(displayedResults)
+      if (cancelled || updates.size === 0) return
+      setAllResults(prev => prev.map(card => (
+        updates.has(card.id) ? { ...card, prices: updates.get(card.id) } : card
+      )))
+    }, 400)
+
+    return () => { cancelled = true; clearTimeout(timer) }
+    // Keyed on the query rather than the result array so this runs once per
+    // search, not on every re-sort.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastQuery, searchSource])
+
+  async function handleRefreshPrices() {
+    if (pricesRefreshing) return
+    setPricesRefreshing(true)
+    try {
+      const updates = await refreshPrices(displayedResults, { force: true })
+      if (updates.size > 0) {
+        setAllResults(prev => prev.map(card => (
+          updates.has(card.id) ? { ...card, prices: updates.get(card.id) } : card
+        )))
+        showSyncNotice('Refreshed prices for ' + updates.size + ' card' + (updates.size === 1 ? '' : 's'))
+      } else {
+        showSyncNotice('Prices are already current')
+      }
+    } finally {
+      setPricesRefreshing(false)
+    }
+  }
 
   // Restore the last search once we know the DB and mode are settled.
   // Runs once on first transition into a usable state.
@@ -1311,6 +1353,16 @@ function App() {
                   )}
                 </span>
                 {allResults.length >= 500 && <span>(limit reached)</span>}
+                {(searchSource === 'local' || searchSource === 'local-scan') && (
+                  <button
+                    onClick={handleRefreshPrices}
+                    disabled={pricesRefreshing}
+                    className={`px-2 py-0.5 rounded text-xs ${theme.bgTertiary} ${theme.textSecondary} disabled:opacity-60`}
+                    title="Fetch current prices for the cards shown"
+                  >
+                    {pricesRefreshing ? 'Refreshing prices...' : 'Refresh prices'}
+                  </button>
+                )}
                 {searchSource && (
                   <span className={`px-2 py-0.5 rounded text-xs ${
                     searchSource === 'scryfall'
