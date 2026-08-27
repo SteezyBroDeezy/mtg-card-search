@@ -270,8 +270,31 @@ function Settings({ currentTheme, onThemeChange, onClose, cardCount, onSync, gro
           <p className={`${theme.textSecondary} text-xs text-center mt-2`}>
             {dbStatus === 'ready'
               ? 'Needs an internet connection.'
-              : 'Downloads ~30,000 unique cards. Works on mobile!'}
+              : 'Downloads ~32,000 unique cards. Works on mobile!'}
           </p>
+
+          {dbStatus === 'ready' && (
+            <div className={`border-t ${theme.border} mt-4 pt-4`}>
+              <p className={`${theme.textSecondary} text-xs mb-3`}>
+                Updating only fetches newly released cards, so cards already stored
+                keep the printing and prices they were saved with. A full re-download
+                refreshes every card — cheapest printing prices, alternate printing
+                names, and the type index that speeds up searches. Takes a few
+                minutes and needs a good connection.
+              </p>
+              <button
+                onClick={() => {
+                  const ok = window.confirm(
+                    'Re-download all ~32,000 cards? This replaces the local database and takes a few minutes. Your lists are stored in your account and are not affected.'
+                  )
+                  if (ok) onDownload?.()
+                }}
+                className={`w-full py-3 ${theme.bgTertiary} border ${theme.border} ${theme.text} rounded-lg font-medium`}
+              >
+                Re-download Everything
+              </button>
+            </div>
+          )}
         </div>
 
         {/* App version */}
