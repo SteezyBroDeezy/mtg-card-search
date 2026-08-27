@@ -12,7 +12,8 @@ import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db, openDatabase, resetDatabase } from './lib/db'
 import { downloadCards, syncNewCards, autoSyncNewCards, resolveFlavorName } from './lib/scryfall'
-import { parseSearch, matchesFilters, normalizeQuotes, toScryfallQuery } from './lib/search'
+import { parseSearch, normalizeQuotes, toScryfallQuery } from './lib/search'
+import { searchLocal } from './lib/localSearch'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import {
@@ -689,17 +690,13 @@ function App() {
           results = await searchScryfall(query)
         } else {
           setSearchSource('local')
-          if (filters.length === 0 && nameSearch) {
-            results = await db.cards
-              .filter(card => card.name.toLowerCase().includes(nameSearch.toLowerCase()))
-              .limit(500)
-              .toArray()
-          } else {
-            results = await db.cards
-              .filter(card => matchesFilters(card, filters, nameSearch))
-              .limit(500)
-              .toArray()
-          }
+          // Index-anchored where possible; falls back to a full scan only
+          // for queries no index can answer, such as oracle text.
+          results = await searchLocal(
+            { filters, nameSearch },
+            SEARCH_RESULT_LIMIT,
+            () => setSearchSource('local-scan')
+          )
         }
       } catch (err) {
         console.error('Search error:', err)
@@ -1318,7 +1315,9 @@ function App() {
                       ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                       : 'bg-gray-600/30 text-gray-400'
                   }`}>
-                    via {searchSource === 'scryfall' ? 'Scryfall API' : 'Local DB'}
+                    via {searchSource === 'scryfall'
+                      ? 'Scryfall API'
+                      : searchSource === 'local-scan' ? 'Local DB (full scan)' : 'Local DB'}
                   </span>
                 )}
               </p>

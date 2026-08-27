@@ -184,7 +184,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             ? db.cards
                 .where('name_words')
                 .startsWith(flatQuery.split(' ')[0])
-                .limit(400)
+                .limit(50)
                 .toArray()
             : Promise.resolve([]),
           db.cards
