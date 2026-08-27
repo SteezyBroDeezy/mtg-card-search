@@ -13,7 +13,7 @@ import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db, openDatabase, resetDatabase } from './lib/db'
 import { downloadCards, syncNewCards, autoSyncNewCards, resolveFlavorName } from './lib/scryfall'
 import { parseSearch, normalizeQuotes, toScryfallQuery } from './lib/search'
-import { searchLocal } from './lib/localSearch'
+import { searchLocal, clearSearchCache } from './lib/localSearch'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
 import {
@@ -472,6 +472,7 @@ function App() {
       setLastDbSync(info.lastSync)
       setDbStatus('ready')
       setDownloadProgress(null)
+      clearSearchCache()
       showSyncNotice(`Downloaded ${result.total.toLocaleString()} cards`)
     } catch (error) {
       console.error('Download failed:', error)
@@ -498,6 +499,7 @@ function App() {
       setLastDbSync(info.lastSync)
       setDbStatus('ready')
       setDownloadProgress(null)
+      clearSearchCache()
       const added = result.fullDownload ? Math.max(0, result.total - before) : result.added
       showSyncNotice(
         added > 0

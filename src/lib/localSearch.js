@@ -39,6 +39,15 @@ function anchorCollection(filters) {
   const rarity = find('rarity')
   if (rarity?.value) return db.cards.where('rarity').equals(String(rarity.value).toLowerCase())
 
+  // t: is one of the most common filters and used to force a full scan.
+  // Anchor on the first word of the value; the predicate still confirms the
+  // full match, so partial words like t:creat keep working.
+  const type = find('type')
+  if (type?.value) {
+    const word = String(type.value).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)[0]
+    if (word) return { collection: db.cards.where('type_words').startsWith(word), unverified: true }
+  }
+
   return null
 }
 
@@ -72,14 +81,51 @@ async function nameCandidates(nameSearch, limit) {
  * `onFullScan` is called when the fast paths miss and every row has to be
  * read, so the UI can say so rather than appearing frozen.
  */
+// Handful of recent result sets, keyed by the parsed query. Re-running a
+// search — going back from a card, restoring on reopen, toggling a sort —
+// then costs nothing. Deliberately small: a full result set is up to 500
+// cards.
+const CACHE_LIMIT = 5
+const resultCache = new Map()
+
+export function clearSearchCache() {
+  resultCache.clear()
+}
+
 export async function searchLocal({ filters, nameSearch }, limit = 500, onFullScan) {
+  const cacheKey = JSON.stringify({ filters, nameSearch, limit })
+  if (resultCache.has(cacheKey)) {
+    const hit = resultCache.get(cacheKey)
+    // Refresh recency.
+    resultCache.delete(cacheKey)
+    resultCache.set(cacheKey, hit)
+    return hit
+  }
+
+  const results = await runSearch({ filters, nameSearch }, limit, onFullScan)
+
+  resultCache.set(cacheKey, results)
+  if (resultCache.size > CACHE_LIMIT) {
+    resultCache.delete(resultCache.keys().next().value)
+  }
+  return results
+}
+
+async function runSearch({ filters, nameSearch }, limit, onFullScan) {
   // 1. Anchored on an indexed filter — narrow first, predicate second.
-  const anchored = anchorCollection(filters)
-  if (anchored) {
-    return await anchored
+  const anchor = anchorCollection(filters)
+  if (anchor) {
+    const collection = anchor.collection || anchor
+    const results = await collection
       .filter(card => matchesFilters(card, filters, nameSearch))
       .limit(limit)
       .toArray()
+
+    // An "unverified" anchor (type_words) is only present on cards stored
+    // since that index was added. No hits may mean no matches, or may mean
+    // the index is empty for this database — fall through rather than
+    // wrongly reporting nothing found.
+    if (results.length > 0 || !anchor.unverified) return results
   }
 
   // 2. Name-led search: indexed prefix lookups, then the remaining filters.

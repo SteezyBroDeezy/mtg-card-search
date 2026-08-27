@@ -45,6 +45,9 @@ flavor_name: card.flavor_name || '', // Secret Lair / Universe Beyond alternate 
   name_normalized: normalizeText(card.name),
   name_search: searchNormalize(card.name),
   name_words: normalizeText(card.name).split(/\s+/).filter(Boolean),
+  // Indexed so t: searches can narrow before filtering. "Legendary
+  // Creature — Elf Druid" becomes [legendary, creature, elf, druid].
+  type_words: (card.type_line || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean),
   flavor_name_normalized: normalizeText(card.flavor_name || ''),
   flavor_name_search: searchNormalize(card.flavor_name || ''),
     type_line: card.type_line || '',
