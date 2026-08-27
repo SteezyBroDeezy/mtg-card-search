@@ -69,6 +69,13 @@ function MyLists({ userId, onClose, onCardClick }) {
       if (result.success) {
         await loadLists()
         await loadSyncStatus()
+        // Sync can pull cards into the list currently on screen; re-read it
+        // so they actually appear instead of after a back-and-forth.
+        if (selectedList) {
+          const refreshed = await getLocalLists()
+          const current = refreshed.find(l => l.id === selectedList.id)
+          if (current) await handleSelectList(current)
+        }
       } else {
         alert('Sync failed: ' + result.error)
       }

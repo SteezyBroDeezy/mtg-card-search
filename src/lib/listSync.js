@@ -47,6 +47,10 @@ export async function createListLocal(name) {
 export async function deleteListLocal(listId) {
   await db.lists.delete(listId)
   await db.listCards.where('listId').equals(listId).delete()
+  if (!listId.startsWith('local_')) {
+    await db.deletedLists.put({ id: listId, deletedAt: new Date().toISOString() })
+  }
+  await db.deletedCards.where('listId').equals(listId).delete()
 }
 
 // Get cards in a list (local)
@@ -97,6 +101,9 @@ export async function addCardToListLocal(listId, card, note = '') {
 // Remove card from list locally
 export async function removeCardFromListLocal(listId, cardId) {
   await db.listCards.delete([listId, cardId])
+  // Remember it was deleted, so the next sync removes it from the account
+  // instead of pulling it back down.
+  await db.deletedCards.put({ listId, cardId, deletedAt: new Date().toISOString() })
 
   // Update card count
   const list = await db.lists.get(listId)
@@ -218,6 +225,31 @@ export async function syncLists(userId) {
   if (!userId) return { success: false, error: 'Not logged in' }
 
   try {
+    // 0. Push deletions first, so nothing removed here comes back below.
+    const deletedLists = await db.deletedLists.toArray()
+    for (const row of deletedLists) {
+      try {
+        await firebaseDeleteList(userId, row.id)
+        await db.deletedLists.delete(row.id)
+      } catch (err) {
+        console.error('Could not delete list in cloud:', row.id, err)
+      }
+    }
+
+    const deletedCards = await db.deletedCards.toArray()
+    for (const row of deletedCards) {
+      if (row.listId?.startsWith('local_')) {
+        await db.deletedCards.delete([row.listId, row.cardId])
+        continue
+      }
+      try {
+        await firebaseRemoveCard(userId, row.listId, row.cardId)
+        await db.deletedCards.delete([row.listId, row.cardId])
+      } catch (err) {
+        console.error('Could not delete card in cloud:', row.cardId, err)
+      }
+    }
+
     // 1. Get local lists
     const localLists = await db.lists.toArray()
 
@@ -291,6 +323,45 @@ export async function syncLists(userId) {
             synced: true
           })
         }
+      }
+    }
+
+    // 5b. Pull cards into lists that already exist locally.
+    //
+    // Previously only brand-new lists had their cards fetched, so a card
+    // added to an existing list on another device never arrived here — the
+    // list was already known, so it was skipped entirely.
+    const deletedNow = await db.deletedCards.toArray()
+    const tombstoned = new Set(deletedNow.map(d => `${d.listId}:${d.cardId}`))
+
+    for (const firebase of firebaseLists) {
+      if (!localListMap.has(firebase.id)) continue // handled in step 5
+      try {
+        const firebaseCards = await getCardsInList(userId, firebase.id)
+        const localCards = await db.listCards.where('listId').equals(firebase.id).toArray()
+        const haveLocally = new Set(localCards.map(c => c.cardId))
+
+        for (const card of firebaseCards) {
+          const cardId = card.cardId || card.id
+          if (!cardId || haveLocally.has(cardId)) continue
+          if (tombstoned.has(`${firebase.id}:${cardId}`)) continue
+          await db.listCards.put({
+            listId: firebase.id,
+            cardId,
+            name: card.name,
+            image_small: card.image_small,
+            image_normal: card.image_normal,
+            note: card.note || '',
+            addedAt: card.addedAt,
+            synced: true
+          })
+        }
+
+        // Keep the badge honest after a merge.
+        const count = await db.listCards.where('listId').equals(firebase.id).count()
+        await db.lists.update(firebase.id, { cardCount: count })
+      } catch (err) {
+        console.error('Could not merge cards for list:', firebase.id, err)
       }
     }
 
