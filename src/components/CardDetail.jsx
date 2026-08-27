@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
 import SyncListsButton from './SyncListsButton'
+import { refreshPrices } from '../lib/priceRefresh'
 import SwipeHandle from './SwipeHandle'
 import SaveToListModal from './SaveToListModal'
 import {
@@ -28,6 +29,40 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
       setInWatchlist(isInWatchlistCached(card.id))
     }
   }, [user, card])
+
+  // Opening a card is the moment its price matters most, so check it against
+  // Scryfall right then (one request) and say when it was last checked.
+  const [livePrices, setLivePrices] = useState(null)
+  const [priceCheckedAt, setPriceCheckedAt] = useState(card?.prices_updated_at || null)
+
+  useEffect(() => {
+    if (!card?.id) return
+    setLivePrices(null)
+    setPriceCheckedAt(card.prices_updated_at || null)
+    if (!navigator.onLine) return
+
+    let cancelled = false
+    refreshPrices([card], { force: true }).then(updates => {
+      if (cancelled) return
+      const update = updates.get(card.id)
+      if (!update) return
+      setLivePrices(update.prices)
+      setPriceCheckedAt(new Date().toISOString())
+    })
+    return () => { cancelled = true }
+  }, [card])
+
+  function formatPriceAge(iso) {
+    if (!iso) return 'from your last database download'
+    const ms = Date.now() - new Date(iso).getTime()
+    if (!Number.isFinite(ms)) return 'from your last database download'
+    const mins = Math.floor(ms / 60000)
+    if (mins < 1) return 'checked just now'
+    if (mins < 60) return `checked ${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `checked ${hours}h ago`
+    return `checked ${Math.floor(hours / 24)}d ago`
+  }
 
   if (!card) return null
 
@@ -120,7 +155,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
   const majorFormats = ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'commander', 'pauper']
   const legalFormats = majorFormats.filter(f => card.legalities?.[f] === 'legal')
 
-  const allPrices = getAllPrices(card)
+  const allPrices = getAllPrices(livePrices ? { ...card, prices: livePrices } : card)
   const bestPrice = getBestPrice(card)
 
   return (
@@ -334,7 +369,10 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
 
               {/* Multi-Source Prices */}
               <div className="p-4 bg-gray-900 rounded-lg">
-                <p className="text-gray-400 text-sm mb-3">Prices</p>
+                <div className="flex items-baseline justify-between mb-3 gap-2">
+                  <p className="text-gray-400 text-sm">Prices</p>
+                  <p className="text-gray-500 text-xs">{formatPriceAge(priceCheckedAt)}</p>
+                </div>
                 {allPrices.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3">
                     {allPrices.map((p, i) => (

@@ -29,8 +29,8 @@ function isStale(card, maxAgeMs) {
 /**
  * Refresh prices for the given cards, newest first.
  *
- * Returns a Map of card id to the updated prices object. Cards whose prices
- * were fetched recently are skipped. Best effort: on any failure the stored
+ * Returns a Map of card id to { prices, changed, previousUsd } so callers
+ * can report how many actually moved. Cards priced recently are skipped. Best effort: on any failure the stored
  * prices simply stay as they are.
  */
 export async function refreshPrices(cards, { maxAgeMs = DEFAULT_MAX_AGE_MS, force = false } = {}) {
@@ -54,9 +54,16 @@ export async function refreshPrices(cards, { maxAgeMs = DEFAULT_MAX_AGE_MS, forc
 
       const data = await response.json()
       const rows = []
+      const previous = new Map(batch.map(c => [c.id, c.prices?.usd ?? null]))
       for (const card of data.data || []) {
         if (!card.id || !card.prices) continue
-        updated.set(card.id, card.prices)
+        const before = previous.get(card.id)
+        const after = card.prices.usd ?? null
+        updated.set(card.id, {
+          prices: card.prices,
+          changed: before !== after,
+          previousUsd: before,
+        })
         rows.push({ id: card.id, prices: card.prices, prices_updated_at: stamp })
       }
 

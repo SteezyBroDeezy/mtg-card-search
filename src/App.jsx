@@ -442,6 +442,24 @@ function App() {
     return () => clearTimeout(timer)
   }, [dbStatus])
 
+  // How fresh the prices on screen are, so "did the refresh actually run?"
+  // is answerable at a glance rather than a matter of faith.
+  const priceFreshness = useMemo(() => {
+    if (displayedResults.length === 0) return null
+    let oldest = null
+    let unpriced = 0
+    for (const card of displayedResults) {
+      if (!card.prices_updated_at) { unpriced++; continue }
+      const time = new Date(card.prices_updated_at).getTime()
+      if (Number.isFinite(time) && (oldest === null || time < oldest)) oldest = time
+    }
+    // Never refreshed since download: report the database's own age.
+    if (oldest === null) return { label: 'from last download', stale: true }
+    if (unpriced > 0) return { label: formatTimeAgo(oldest) + ' (some from download)', stale: true }
+    const ageMs = Date.now() - oldest
+    return { label: formatTimeAgo(oldest), stale: ageMs > 24 * 60 * 60 * 1000 }
+  }, [displayedResults])
+
   // Offline results carry whatever prices were stored at download time, and
   // those drift. Refresh just the cards on screen — one request per 75 —
   // rather than making the user re-download the database for fresh numbers.
@@ -453,9 +471,16 @@ function App() {
     const timer = setTimeout(async () => {
       const updates = await refreshPrices(displayedResults)
       if (cancelled || updates.size === 0) return
+      const stamp = new Date().toISOString()
       setAllResults(prev => prev.map(card => (
-        updates.has(card.id) ? { ...card, prices: updates.get(card.id) } : card
+        updates.has(card.id)
+          ? { ...card, prices: updates.get(card.id).prices, prices_updated_at: stamp }
+          : card
       )))
+      const moved = [...updates.values()].filter(u => u.changed).length
+      if (moved > 0) {
+        showSyncNotice(`Prices updated — ${moved} card${moved === 1 ? '' : 's'} changed since last check`)
+      }
     }, 400)
 
     return () => { cancelled = true; clearTimeout(timer) }
@@ -470,12 +495,19 @@ function App() {
     try {
       const updates = await refreshPrices(displayedResults, { force: true })
       if (updates.size > 0) {
+        const stamp = new Date().toISOString()
         setAllResults(prev => prev.map(card => (
-          updates.has(card.id) ? { ...card, prices: updates.get(card.id) } : card
+          updates.has(card.id)
+            ? { ...card, prices: updates.get(card.id).prices, prices_updated_at: stamp }
+            : card
         )))
-        showSyncNotice('Refreshed prices for ' + updates.size + ' card' + (updates.size === 1 ? '' : 's'))
+        const moved = [...updates.values()].filter(u => u.changed).length
+        showSyncNotice(
+          `Checked ${updates.size} card${updates.size === 1 ? '' : 's'} — ` +
+          (moved > 0 ? `${moved} price${moved === 1 ? '' : 's'} changed` : 'no price changes')
+        )
       } else {
-        showSyncNotice('Prices are already current')
+        showSyncNotice('No cards on screen to price')
       }
     } finally {
       setPricesRefreshing(false)
@@ -1362,6 +1394,18 @@ function App() {
                   >
                     {pricesRefreshing ? 'Refreshing prices...' : 'Refresh prices'}
                   </button>
+                )}
+                {priceFreshness && (
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs ${
+                      priceFreshness.stale
+                        ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                        : 'bg-green-600/20 text-green-300 border border-green-600/30'
+                    }`}
+                    title="How recently the prices shown were checked against Scryfall"
+                  >
+                    prices {priceFreshness.label}
+                  </span>
                 )}
                 {searchSource && (
                   <span className={`px-2 py-0.5 rounded text-xs ${
