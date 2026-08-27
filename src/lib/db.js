@@ -3,6 +3,25 @@ import Dexie from 'dexie'
 // Create the database
 export const db = new Dexie('mtg-card-search')
 
+// Version 8 - Alternate printing names in their own small table.
+//
+// Cards like Heroic Intervention have Secret Lair printings sold under a
+// different title ("Aerith's Curaga Magic") with the real name printed
+// underneath. Scryfall models that as flavor_name on the printing. The cards
+// table only stores one printing per card — usually the cheapest — so that
+// alternate title normally isn't there to search for.
+//
+// Only ~631 paper printings have one, so they live in their own table rather
+// than as another index on the 32k-row cards table. A new table costs
+// nothing to create; adding an index would mean rebuilding one.
+db.version(8).stores({
+  cards: 'id, name, name_normalized, name_search, *name_words, flavor_name, flavor_name_normalized, flavor_name_search, type_line, mana_cost, cmc, set, rarity, colors, power, toughness, artist, loyalty, color_identity, reserved, edhrec_rank, released_at',
+  meta: 'key',
+  lists: 'id, name, createdAt, updatedAt, synced',
+  listCards: '[listId+cardId], listId, cardId, addedAt, synced',
+  flavorNames: 'id, flavor_search, cardName'
+})
+
 // Version 7 - Declares a name_search index for punctuation-insensitive
 // lookups. Deliberately does NOT backfill existing rows: rewriting 32k
 // records, each with a multi-entry word index, took long enough on a phone

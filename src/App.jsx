@@ -11,7 +11,7 @@ import SyntaxHelp from './components/SyntaxHelp'
 import ThemeEffects from './components/ThemeEffects'
 import SetsBrowser from './components/SetsBrowser'
 import { hasCards, getDbInfo, db, openDatabase, resetDatabase } from './lib/db'
-import { downloadCards, syncNewCards, autoSyncNewCards } from './lib/scryfall'
+import { downloadCards, syncNewCards, autoSyncNewCards, resolveFlavorName } from './lib/scryfall'
 import { parseSearch, matchesFilters, normalizeQuotes, toScryfallQuery } from './lib/search'
 import { onAuthChange, logOut } from './lib/firebase'
 import { themes, loadTheme } from './lib/theme'
@@ -710,6 +710,22 @@ function App() {
         })
         setAllResults([])
         return
+      }
+
+      // Nothing found locally by name? It may be an alternate printing
+      // title, e.g. "Aerith's Curaga Magic" for Heroic Intervention.
+      if (results.length === 0 && !useScryfall && nameSearch && filters.length === 0) {
+        const realName = await resolveFlavorName(nameSearch)
+        if (realName) {
+          results = await db.cards
+            .filter(card => card.name.toLowerCase() === realName.toLowerCase())
+            .limit(50)
+            .toArray()
+          if (results.length > 0) {
+            setSearchError(null)
+            showSyncNotice(`"${nameSearch}" is a printing of ${realName}`)
+          }
+        }
       }
 
       let finalResults

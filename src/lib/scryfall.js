@@ -215,6 +215,9 @@ export async function downloadCards(onProgress) {
     await db.meta.put({ key: 'lastReleaseSeen', value: latestRelease })
   }
 
+  onProgress?.({ step: 'Fetching alternate printing names...', percent: 97, detail: '' })
+  await syncFlavorNames()
+
   const totalTime = ((Date.now() - startTime) / 1000 / 60).toFixed(1)
   onProgress?.({
     step: 'Done!',
@@ -320,6 +323,7 @@ export async function syncNewCards(onProgress) {
 
   await db.meta.put({ key: 'lastSync', value: new Date().toISOString() })
   await db.meta.put({ key: 'lastReleaseSeen', value: latestRelease })
+  await syncFlavorNames()
 
   const totalSeconds = ((Date.now() - startTime) / 1000).toFixed(1)
   const total = await db.cards.count()
@@ -371,4 +375,60 @@ export async function autoSyncNewCards() {
     console.error('Auto-sync error:', error)
     return null
   }
+}
+
+/**
+ * Fetch the alternate titles some printings are sold under.
+ *
+ * Secret Lair and Universes Beyond printings can carry a different name on
+ * the card face — "Aerith's Curaga Magic" is a Secret Lair printing of
+ * Heroic Intervention — which Scryfall exposes as flavor_name. Only ~631
+ * paper printings have one, so this is four pages of API calls and about
+ * 50KB stored, and it makes those cards findable under either title.
+ */
+export async function syncFlavorNames(onProgress) {
+  const query = 'game:paper has:flavorname'
+  let nextUrl = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=name`
+  const rows = []
+
+  try {
+    while (nextUrl) {
+      const response = await fetch(nextUrl)
+      if (!response.ok) {
+        if (response.status === 429) { await delay(1000); continue }
+        break
+      }
+      const data = await response.json()
+      for (const card of data.data || []) {
+        if (!card.flavor_name) continue
+        rows.push({
+          id: card.id,
+          cardName: card.name,
+          flavorName: card.flavor_name,
+          flavor_search: searchNormalize(card.flavor_name),
+          set: card.set,
+        })
+      }
+      nextUrl = data.has_more && data.next_page ? data.next_page : null
+      if (nextUrl) await delay(100)
+    }
+
+    if (rows.length > 0) {
+      await db.flavorNames.clear()
+      await db.flavorNames.bulkPut(rows)
+      onProgress?.({ step: 'Alternate names updated', percent: 100, detail: `${rows.length} alternate titles` })
+    }
+    return rows.length
+  } catch (error) {
+    console.error('Flavor name sync failed:', error)
+    return 0
+  }
+}
+
+/** Resolve an alternate printing title to the real card name, or null. */
+export async function resolveFlavorName(text) {
+  const needle = searchNormalize(text)
+  if (!needle) return null
+  const match = await db.flavorNames.where('flavor_search').equals(needle).first()
+  return match ? match.cardName : null
 }

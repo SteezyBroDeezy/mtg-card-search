@@ -168,7 +168,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
         // Sculptor", "urzas saga" matches "Urza's Saga".
         const flatQuery = searchNormalize(trimmed)
 
-        const [nameMatches, flatMatches, wordMatches, flavorMatches] = await Promise.all([
+        const [nameMatches, flatMatches, wordMatches, flavorMatches, altTitleMatches] = await Promise.all([
           db.cards
             .where('name_normalized')
             .startsWith(normalizedQuery)
@@ -196,7 +196,16 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
             .where('flavor_name_normalized')
             .startsWith(normalizedQuery)
             .limit(10)
-            .toArray()
+            .toArray(),
+          // Alternate printing titles: "Aerith's Curaga Magic" resolves to
+          // Heroic Intervention, which is what actually gets searched.
+          flatQuery
+            ? db.flavorNames
+                .where('flavor_search')
+                .startsWith(flatQuery)
+                .limit(10)
+                .toArray()
+            : Promise.resolve([])
         ])
 
         if (cancelled) return
@@ -219,6 +228,18 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           if (!flatName.startsWith(flatQuery)) continue
           seen.add(card.name)
           combined.push({ name: card.name, displayName: card.name, priority: 1.2 })
+        }
+
+        // Priority 1.4: an alternate printing title. Shown under the title
+        // printed on the card, but searched under the real name.
+        for (const row of altTitleMatches) {
+          if (seen.has(row.cardName)) continue
+          seen.add(row.cardName)
+          combined.push({
+            name: row.cardName,
+            displayName: `${row.flavorName} (${row.cardName})`,
+            priority: 1.4
+          })
         }
 
         // Priority 1.5: flavor_name starts with query
