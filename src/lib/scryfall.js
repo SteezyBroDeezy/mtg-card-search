@@ -428,6 +428,22 @@ export async function syncFlavorNames(onProgress) {
   }
 }
 
+/**
+ * Printed titles for a set of printings, keyed by printing id.
+ *
+ * The cards table stores one printing per card and usually the cheapest,
+ * which is rarely the reskinned one, so card.flavor_name is almost never
+ * populated even when a reskin exists. Reading it off the record shows
+ * nothing; this table is where the answer actually lives.
+ */
+export async function flavorNamesByPrintingId(ids) {
+  const found = new Map()
+  if (!ids?.length) return found
+  const rows = await db.flavorNames.where('id').anyOf(ids).toArray()
+  for (const row of rows) found.set(row.id, row.flavorName)
+  return found
+}
+
 /** Resolve an alternate printing title to the real card name, or null. */
 export async function resolveFlavorName(text) {
   const needle = searchNormalize(text)

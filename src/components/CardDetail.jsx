@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
 import SyncListsButton from './SyncListsButton'
 import { refreshPrices } from '../lib/priceRefresh'
+import { flavorNamesByPrintingId } from '../lib/scryfall'
 import SwipeHandle from './SwipeHandle'
 import SaveToListModal from './SaveToListModal'
 import {
@@ -22,6 +23,20 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
 
   // Pull the detail panel down to dismiss it.
   const swipe = useSwipeToClose(onClose)
+
+  // Printed titles for this card's printings, keyed by printing id. Kept
+  // out of the card records on purpose — see flavorNamesByPrintingId.
+  const [flavorNames, setFlavorNames] = useState(new Map())
+
+  useEffect(() => {
+    const ids = [card?.id, ...allPrintings.map(p => p.id)].filter(Boolean)
+    if (!ids.length) { setFlavorNames(new Map()); return }
+    let cancelled = false
+    flavorNamesByPrintingId(ids)
+      .then(found => { if (!cancelled) setFlavorNames(found) })
+      .catch(() => { if (!cancelled) setFlavorNames(new Map()) })
+    return () => { cancelled = true }
+  }, [card?.id, allPrintings])
 
   useEffect(() => {
     if (user && card) {
@@ -142,6 +157,7 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
                        activeFace?.image_uris?.large || activeFace?.image_uris?.normal ||
                        card.image_large || card.image_normal ||
                        card.image_uris?.large || card.image_uris?.normal
+  const flavorName = flavorNames.get(card.id) || card.flavor_name || ''
   const displayName = activeFace?.name || card.name
   const displayType = activeFace?.type_line || card.type_line
   const displayManaCost = activeFace?.mana_cost || card.mana_cost
@@ -172,7 +188,21 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
         >
           <SwipeHandle />
           <div className="flex justify-between items-center p-3 sm:p-4 border-b border-gray-700 sticky top-0 bg-gray-800 z-10">
-            <h2 className="text-lg sm:text-xl font-bold truncate pr-2">{card.name}</h2>
+            {/* Reskinned printings (Secret Lair, Universes Beyond) print a
+                different name on the card than the one Scryfall files them
+                under: the Final Fantasy Ragavan reads "Zidane Tribal". Both
+                belong here — the printed name is what the user is holding,
+                the real name is what it is for rules, pricing and search. */}
+            <div className="min-w-0 pr-2">
+              <h2 className="text-lg sm:text-xl font-bold truncate">
+                {flavorName || card.name}
+              </h2>
+              {flavorName && (
+                <p className="text-xs text-gray-400 truncate">
+                  reskin of {card.name}
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* Sticky header, so this stays reachable however far you
                   scroll through printings. */}
@@ -510,6 +540,15 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{printing.set_name}</p>
+                          {/* Without this a reskinned printing is
+                              indistinguishable from a normal one: same row,
+                              same price column, but the card in hand says
+                              something else entirely. */}
+                          {(flavorNames.get(printing.id) || printing.flavor_name) && (
+                            <p className="text-sm text-purple-300 truncate">
+                              printed as "{flavorNames.get(printing.id) || printing.flavor_name}"
+                            </p>
+                          )}
                           <p className="text-sm text-gray-400">
                             {printing.set.toUpperCase()} · {printing.rarity}
                             {printing.released_at && ` · ${printing.released_at.substring(0, 4)}`}
