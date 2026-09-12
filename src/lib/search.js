@@ -709,10 +709,16 @@ export function toScryfallQuery(rawQuery) {
   const query = normalizeQuotes(rawQuery)
   const parts = query.match(/(?:[^\s"]+|"[^"]*")+/g) || []
   const rewritten = parts.map(part => {
-    const neg = part.startsWith('-')
-    const bare = neg ? part.slice(1) : part
-    if (/^k:/i.test(bare)) return (neg ? '-' : '') + 'kw:' + bare.slice(2)
-    return part
+    // A token can arrive wrapped in parens from a typed (k:flying or
+    // k:trample) group — Scryfall parses the parens itself, so strip and
+    // restore them around the k: -> kw: rewrite rather than skipping it.
+    const open = part.match(/^\(+/)?.[0] || ''
+    const close = part.match(/\)+$/)?.[0] || ''
+    const core = part.slice(open.length, part.length - close.length)
+    const neg = core.startsWith('-')
+    const bare = neg ? core.slice(1) : core
+    const rewrittenCore = /^k:/i.test(bare) ? (neg ? '-' : '') + 'kw:' + bare.slice(2) : core
+    return open + rewrittenCore + close
   })
 
   // Respect an explicit choice rather than fighting it.
@@ -758,14 +764,97 @@ export function looksLikeFilterQuery(text) {
   return FILTER_TOKEN.test(text) || COMPARISON_TOKEN.test(text)
 }
 
+// A single filter term, understood the same way whether it stands on its
+// own or sits inside an (a or b) group — see parseSearch. Only the simple,
+// single-value prefixes are handled; comparisons and c=/exact-color syntax
+// stay outside a group (nobody OR's a range, and exact-color parsing needs
+// more than one token). Returns null for anything it doesn't recognize so
+// the caller can fall back to Scryfall instead of silently dropping it.
+function parseGroupTerm(token) {
+  const isNegated = token.startsWith('-')
+  const clean = isNegated ? token.slice(1) : token
+  const lower = clean.toLowerCase()
+
+  if (lower.startsWith('t:') || lower.startsWith('type:')) {
+    const value = unquote(lower.slice(lower.indexOf(':') + 1))
+    return { type: 'type', value, negated: isNegated }
+  }
+  if (lower.startsWith('r:') || lower.startsWith('rarity:')) {
+    const value = unquote(lower.slice(lower.indexOf(':') + 1))
+    return { type: 'rarity', value, negated: isNegated }
+  }
+  if (lower.startsWith('c:')) {
+    const colorMap = { white: 'W', w: 'W', blue: 'U', u: 'U', black: 'B', b: 'B', red: 'R', r: 'R', green: 'G', g: 'G', colorless: 'C', c: 'C' }
+    const value = colorMap[lower.slice(2)]
+    return value ? { type: 'color', value, negated: isNegated } : null
+  }
+  if (lower.startsWith('id:')) {
+    return { type: 'color_identity', value: unquote(lower.slice(3)), negated: isNegated }
+  }
+  if (lower.startsWith('s:') || lower.startsWith('set:')) {
+    const value = unquote(lower.slice(lower.indexOf(':') + 1))
+    return { type: 'set', value, negated: isNegated }
+  }
+  if (lower.startsWith('f:') || lower.startsWith('format:')) {
+    const value = unquote(lower.slice(lower.indexOf(':') + 1))
+    return { type: 'format', value, negated: isNegated }
+  }
+  if (lower.startsWith('k:') || lower.startsWith('kw:') || lower.startsWith('keyword:')) {
+    const value = unquote(lower.slice(lower.indexOf(':') + 1))
+    return { type: 'keyword', value, negated: isNegated }
+  }
+  if (lower.startsWith('is:')) {
+    return { type: 'is', value: unquote(lower.slice(3)), negated: isNegated }
+  }
+  if (lower.startsWith('o:')) {
+    return { type: 'oracle', value: lower.slice(2).replace(/"/g, ''), negated: isNegated }
+  }
+  if (lower.startsWith('a:') || lower.startsWith('artist:')) {
+    const value = lower.slice(lower.indexOf(':') + 1).replace(/"/g, '')
+    return { type: 'artist', value, negated: isNegated }
+  }
+  return null
+}
+
 export function parseSearch(rawQuery) {
   const query = normalizeQuotes(rawQuery)
   const filters = []
   let nameSearch = ''
   let requiresScryfall = false
 
+  // Pull out (a or b or ...) groups before the whitespace tokenizer runs —
+  // it doesn't understand parentheses, and a top-level "or" has no other
+  // representation in a filter list that's otherwise pure AND. This is
+  // what lets the type/rarity toggle buttons mean "either", the way
+  // Scryfall's own (t:instant or t:sorcery) syntax does. Groups don't
+  // nest; that covers everything the toggle UI emits and anything a
+  // person would reasonably type by hand.
+  const groupFilters = []
+  const working = query.replace(/\(([^()]*)\)/g, (match, inner) => {
+    const terms = inner.trim().split(/\s+or\s+/i).filter(Boolean)
+    const parsed = terms.map(parseGroupTerm)
+    if (terms.length < 2 || parsed.some(p => p === null)) {
+      // Not an OR group we understand locally — let Scryfall's own parser
+      // handle the original text in online mode rather than dropping it.
+      requiresScryfall = true
+      return ''
+    }
+    // is: covers a couple of properties we can check locally (see
+    // LOCAL_IS_PROPERTIES); anything else inside the group still needs
+    // Scryfall, same as a bare is: term does outside one.
+    const needsScryfall = terms.some(t => {
+      const bare = t.startsWith('-') ? t.slice(1) : t
+      const m = /^is:(.+)/i.exec(bare)
+      return m && !LOCAL_IS_PROPERTIES.has(unquote(m[1].toLowerCase()))
+    })
+    if (needsScryfall) requiresScryfall = true
+    const idx = groupFilters.length
+    groupFilters.push({ type: 'or', filters: parsed })
+    return `__OR_GROUP_${idx}__`
+  })
+
   // Split by spaces, but keep quoted strings together
-  const parts = query.match(/(?:[^\s"]+|"[^"]*")+/g) || []
+  const parts = working.match(/(?:[^\s"]+|"[^"]*")+/g) || []
 
   // Scryfall-only patterns are mostly ^-anchored, so they have to be tested
   // against each token. Testing them against the whole query only ever
@@ -779,6 +868,13 @@ export function parseSearch(rawQuery) {
   }
 
   for (const part of parts) {
+    // A stand-in left behind by the (a or b) pre-pass above.
+    const groupMatch = /^__OR_GROUP_(\d+)__$/.exec(part)
+    if (groupMatch) {
+      filters.push(groupFilters[Number(groupMatch[1])])
+      continue
+    }
+
     // Check for negation prefix
     const isNegated = part.startsWith('-')
     const cleanPart = isNegated ? part.slice(1) : part
@@ -1038,6 +1134,15 @@ function parseColorIdentity(input) {
 // Helper to check a single filter condition (returns true if card matches)
 function checkFilterCondition(card, filter) {
   switch (filter.type) {
+    case 'or':
+      // Each sub-filter carries its own negation (from a term like
+      // "-t:land" inside the group); the group itself matches if any of
+      // them do.
+      return filter.filters.some(sub => {
+        const matches = checkFilterCondition(card, sub)
+        return sub.negated ? !matches : matches
+      })
+
     case 'color':
       if (filter.value === 'C') {
         // Colorless: no colors

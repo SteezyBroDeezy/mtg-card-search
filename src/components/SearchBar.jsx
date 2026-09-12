@@ -420,6 +420,18 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     setArr(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value])
   }
 
+  // One selection emits a bare `prefix:value`. Several emit an OR group —
+  // `(prefix:a or prefix:b)` — Scryfall's own syntax for "either of these",
+  // which search.js's parser understands for both local and online search.
+  function pushToggleGroup(parts, prefix, values) {
+    if (values.length === 0) return
+    if (values.length === 1) {
+      parts.push(`${prefix}:${values[0]}`)
+    } else {
+      parts.push(`(${values.map(v => `${prefix}:${v}`).join(' or ')})`)
+    }
+  }
+
   // Build and apply query from toggles
   function applyFilters() {
     const parts = []
@@ -445,11 +457,15 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
       parts.push(`id:${identityStr}`)
     }
 
-    // Types
-    selectedTypes.forEach(t => parts.push(`t:${t.toLowerCase()}`))
+    // Types — a card only ever has one, so picking several means "any of
+    // these" (t:instant or t:sorcery), not "all of these" (which every
+    // real card would fail). Same reasoning for rarity. Formats and
+    // keywords stay AND-joined below: a card can legally hold several of
+    // each, and that intersection is what selecting more than one means.
+    pushToggleGroup(parts, 't', selectedTypes.map(t => t.toLowerCase()))
 
     // Rarities
-    selectedRarities.forEach(r => parts.push(`r:${r}`))
+    pushToggleGroup(parts, 'r', selectedRarities)
 
     // Formats
     selectedFormats.forEach(f => parts.push(`f:${f}`))
