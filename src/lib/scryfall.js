@@ -41,6 +41,13 @@ function processCard(card) {
   let cardData = {
     id: card.id,
     name: card.name,
+    // prefer:usd-low (see toScryfallQuery below) picks the cheapest paper
+    // printing regardless of language, and that's sometimes a foreign one —
+    // the oracle_text stored here is always Scryfall's canonical English
+    // text, but the card IMAGE is a photo of whatever printing this is, so
+    // a Japanese-cheapest card shows a Japanese picture. Recording lang
+    // lets the UI flag that and offer an English printing to look at.
+    lang: card.lang || 'en',
 flavor_name: card.flavor_name || '', // Secret Lair / Universe Beyond alternate names
   name_normalized: normalizeText(card.name),
   name_search: searchNormalize(card.name),
@@ -450,4 +457,43 @@ export async function resolveFlavorName(text) {
   if (!needle) return null
   const match = await db.flavorNames.where('flavor_search').equals(needle).first()
   return match ? match.cardName : null
+}
+
+// Scryfall's printing language codes, for the "cheapest printing is
+// foreign" notice on a card whose lang isn't 'en'. Not every code Scryfall
+// uses is worth a full name here — anything missing just falls back to the
+// raw code, which is still better than nothing.
+export const LANGUAGE_NAMES = {
+  en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
+  pt: 'Portuguese', ja: 'Japanese', ko: 'Korean', ru: 'Russian',
+  zhs: 'Chinese (Simplified)', zht: 'Chinese (Traditional)', he: 'Hebrew',
+  la: 'Latin', grc: 'Ancient Greek', ar: 'Arabic', sa: 'Sanskrit',
+  ph: 'Phyrexian', qya: 'Quenya',
+}
+
+/**
+ * The cards table keeps one printing per name — usually the cheapest paper
+ * printing (see toScryfallQuery's prefer:usd-low), which is sometimes a
+ * foreign-language one. This looks up the cheapest ENGLISH printing of the
+ * same card instead, for the "show me one I can read" toggle in
+ * CardDetail. Returns null if there isn't one, or the lookup fails.
+ */
+export async function fetchCheapestEnglishPrinting(name) {
+  const query = `!${JSON.stringify(name)} lang:en game:paper`
+  const url = `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=usd&dir=asc`
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = await res.json()
+    const card = data.data?.[0]
+    if (!card) return null
+    return {
+      ...card,
+      image_small: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || '',
+      image_normal: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '',
+      image_large: card.image_uris?.large || card.card_faces?.[0]?.image_uris?.large || ''
+    }
+  } catch {
+    return null
+  }
 }

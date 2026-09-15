@@ -1527,6 +1527,16 @@ function App() {
                       </button>
                     )}
 
+                    {/* The stored/cheapest printing is sometimes foreign —
+                        flag it here so it's visible before opening the
+                        card. The English toggle itself lives in CardDetail,
+                        where there's room to explain it. */}
+                    {card.lang && card.lang !== 'en' && (
+                      <div className="absolute top-2 left-2 bg-amber-600/90 text-white text-[10px] px-1.5 py-0.5 rounded uppercase">
+                        {card.lang}
+                      </div>
+                    )}
+
                     {/* Price and versions badges - bottom center together */}
                     <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1">
                       {card._printingCount > 1 && (

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSwipeToClose } from '../lib/useSwipeToClose'
 import SyncListsButton from './SyncListsButton'
 import { refreshPrices } from '../lib/priceRefresh'
-import { flavorNamesByPrintingId } from '../lib/scryfall'
+import { flavorNamesByPrintingId, fetchCheapestEnglishPrinting, LANGUAGE_NAMES } from '../lib/scryfall'
 import SwipeHandle from './SwipeHandle'
 import SaveToListModal from './SaveToListModal'
 import {
@@ -20,6 +20,20 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
   const [inWatchlist, setInWatchlist] = useState(false)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
   const [watchlistError, setWatchlistError] = useState(null)
+
+  // The stored/cheapest printing is sometimes non-English (see lang on the
+  // card record) — the image on a Japanese Bolt is a photo of a Japanese
+  // card. This is the "let me look at an English one instead" toggle.
+  const [showEnglish, setShowEnglish] = useState(false)
+  const [englishPrinting, setEnglishPrinting] = useState(null)
+  const [englishLoading, setEnglishLoading] = useState(false)
+  const [englishError, setEnglishError] = useState(null)
+
+  useEffect(() => {
+    setShowEnglish(false)
+    setEnglishPrinting(null)
+    setEnglishError(null)
+  }, [card?.id])
 
   // Pull the detail panel down to dismiss it.
   const swipe = useSwipeToClose(onClose)
@@ -127,6 +141,43 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
     setWatchlistLoading(false)
   }
 
+  async function handleToggleEnglish() {
+    if (showEnglish) {
+      setShowEnglish(false)
+      return
+    }
+    if (englishPrinting) {
+      setShowEnglish(true)
+      return
+    }
+    // Online mode already fetched every printing (allPrintings), so check
+    // there first — no need to hit the network again.
+    const knownEnglish = allPrintings
+      .filter(p => (p.lang || 'en') === 'en' && parseFloat(p.prices?.usd))
+      .sort((a, b) => parseFloat(a.prices.usd) - parseFloat(b.prices.usd))[0]
+    if (knownEnglish) {
+      setEnglishPrinting(knownEnglish)
+      setShowEnglish(true)
+      return
+    }
+    // Offline-first mode only ever stores one printing per name locally, so
+    // finding an English one means asking Scryfall directly.
+    if (!navigator.onLine) {
+      setEnglishError('Connect to the internet to load an English printing')
+      return
+    }
+    setEnglishLoading(true)
+    setEnglishError(null)
+    const found = await fetchCheapestEnglishPrinting(card.name)
+    setEnglishLoading(false)
+    if (found) {
+      setEnglishPrinting(found)
+      setShowEnglish(true)
+    } else {
+      setEnglishError("Couldn't find an English printing")
+    }
+  }
+
   // Get all price displays (USD only - TCGPlayer)
   function getAllPrices(c) {
     const prices = []
@@ -152,8 +203,22 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
     return { price: 'No price', type: '' }
   }
 
+  // A card is "foreign" here at the printing level, not per-face — every
+  // face of a Japanese card is Japanese, so this only needs card.lang.
+  const isForeignPrinting = Boolean(card.lang) && card.lang !== 'en'
+  const englishImage = englishPrinting && (
+    englishPrinting.image_large || englishPrinting.image_normal ||
+    englishPrinting.image_uris?.large || englishPrinting.image_uris?.normal ||
+    englishPrinting.card_faces?.[0]?.image_uris?.large ||
+    englishPrinting.card_faces?.[0]?.image_uris?.normal
+  )
+
   // Get current display values - handle both local DB format and Scryfall API format
-  const displayImage = activeFace?.image_large || activeFace?.image_normal ||
+  // Showing the English printing overrides only the image — price, oracle
+  // text, type, etc. below all keep describing the actual cheapest
+  // (possibly foreign) printing, since that's the one being bought.
+  const displayImage = (showEnglish && englishImage) ||
+                       activeFace?.image_large || activeFace?.image_normal ||
                        activeFace?.image_uris?.large || activeFace?.image_uris?.normal ||
                        card.image_large || card.image_normal ||
                        card.image_uris?.large || card.image_uris?.normal
@@ -284,6 +349,29 @@ function CardDetail({ card, allPrintings = [], onClose, onSelectPrinting, user, 
                   </div>
                 )}
               </div>
+
+              {/* Foreign-cheapest notice + English toggle */}
+              {isForeignPrinting && (
+                <div className="mt-2 max-w-[300px] text-center">
+                  <p className="text-xs text-amber-400">
+                    Cheapest printing shown is {LANGUAGE_NAMES[card.lang] || card.lang} — price and link are still for that one.
+                  </p>
+                  <button
+                    onClick={handleToggleEnglish}
+                    disabled={englishLoading}
+                    className="mt-1 text-xs px-3 py-1 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50"
+                  >
+                    {englishLoading
+                      ? 'Loading English printing...'
+                      : showEnglish
+                      ? 'Showing English — back to cheapest'
+                      : 'Show English printing to read it'}
+                  </button>
+                  {englishError && (
+                    <p className="text-xs text-red-400 mt-1">{englishError}</p>
+                  )}
+                </div>
+              )}
 
               {/* Face selector */}
               {hasMultipleFaces && (
