@@ -29,7 +29,9 @@ function MyLists({ userId, onClose, onCardClick }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null) // list to confirm deletion
   const [selectMode, setSelectMode] = useState(false)
   const [selectedCards, setSelectedCards] = useState(new Set())
-  const [sortBy, setSortBy] = useState('default')
+  // Newest-added first by default — the card you just put in a deck is the
+  // one you're most likely looking for again right after adding it.
+  const [sortBy, setSortBy] = useState('added-desc')
   // Merge dialog: source list to merge into another, target choice, name choice
   const [mergeSource, setMergeSource] = useState(null)
   const [mergeTargetId, setMergeTargetId] = useState('')
@@ -103,7 +105,7 @@ function MyLists({ userId, onClose, onCardClick }) {
   async function handleSelectList(list) {
     setSelectedList(list)
     setLoadingCards(true)
-    setSortBy('default')
+    setSortBy('added-desc')
     try {
       const listCards = await getListCardsLocal(list.id)
       // List rows only carry the bare minimum (id/name/image). Enrich each row
