@@ -84,9 +84,11 @@ function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsyn
       className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-[80]"
       onClick={onClose}
     >
-      {/* Mobile: Bottom sheet | Desktop: Centered modal */}
+      {/* Mobile: Bottom sheet, sized for thumbs | Desktop: a bigger centered
+          modal with tighter, denser controls, so a list of 10+ names
+          doesn't need to scroll just to see them. */}
       <div
-        className={`${bgPrimary} w-full sm:max-w-md sm:mx-4 sm:rounded-xl rounded-t-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col animate-slide-up sm:animate-none`}
+        className={`${bgPrimary} w-full sm:max-w-xl sm:mx-4 sm:rounded-xl rounded-t-2xl max-h-[85vh] sm:max-h-[85vh] flex flex-col animate-slide-up sm:animate-none`}
         onClick={(e) => e.stopPropagation()}
         style={swipe.swipeStyle}
         {...swipe.swipeHandlers}
@@ -97,14 +99,14 @@ function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsyn
         </div>
 
         {/* Header */}
-        <div className="flex justify-between items-center p-4 pb-2">
+        <div className="flex justify-between items-center p-4 pb-2 sm:p-4 sm:pb-2">
           <div>
-            <h2 className={`text-xl font-bold ${textPrimary}`}>Save to List</h2>
-            <p className={`${textSecondary} text-sm mt-0.5 truncate max-w-[250px]`}>{card.name}</p>
+            <h2 className={`text-xl sm:text-lg font-bold ${textPrimary}`}>Save to List</h2>
+            <p className={`${textSecondary} text-sm mt-0.5 truncate max-w-[250px] sm:max-w-xs`}>{card.name}</p>
           </div>
           <button
             onClick={onClose}
-            className={`${textSecondary} hover:text-white text-3xl leading-none w-11 h-11 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20`}
+            className={`${textSecondary} hover:text-white text-3xl sm:text-2xl leading-none w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20`}
             aria-label="Close"
           >
             ×
@@ -124,31 +126,31 @@ function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsyn
             </p>
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden flex flex-col p-4 pt-2">
-            {/* Create New List - Prominent at top */}
-            <div className="mb-4">
+          <div className="flex-1 overflow-hidden flex flex-col p-4 pt-2 sm:p-4 sm:pt-2">
+            {/* Create New List - Prominent at top, but not oversized on desktop */}
+            <div className="mb-4 sm:mb-3">
               {showNewListInput ? (
-                <form onSubmit={handleCreateList} className="space-y-2">
+                <form onSubmit={handleCreateList} className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={newListName}
                     onChange={(e) => setNewListName(e.target.value)}
                     placeholder="Enter list name..."
                     autoFocus
-                    className={`w-full px-4 py-3 ${bgSecondary} border-2 border-blue-500 rounded-xl ${textPrimary} text-lg`}
+                    className={`flex-1 w-full px-4 py-3 sm:px-3 sm:py-2 ${bgSecondary} border-2 border-blue-500 rounded-xl sm:rounded-lg ${textPrimary} text-lg sm:text-sm`}
                   />
                   <div className="flex gap-2">
                     <button
                       type="submit"
                       disabled={creating || !newListName.trim()}
-                      className={`flex-1 py-3 ${accent} hover:opacity-90 text-white rounded-xl font-semibold disabled:opacity-50`}
+                      className={`flex-1 sm:flex-none py-3 sm:py-2 sm:px-4 ${accent} hover:opacity-90 text-white rounded-xl sm:rounded-lg font-semibold sm:text-sm disabled:opacity-50`}
                     >
-                      {creating ? 'Creating...' : 'Create List'}
+                      {creating ? 'Creating...' : 'Create'}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowNewListInput(false); setNewListName('') }}
-                      className={`px-4 py-3 ${bgSecondary} rounded-xl ${textSecondary}`}
+                      className={`px-4 py-3 sm:py-2 ${bgSecondary} rounded-xl sm:rounded-lg sm:text-sm ${textSecondary}`}
                     >
                       Cancel
                     </button>
@@ -157,15 +159,17 @@ function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsyn
               ) : (
                 <button
                   onClick={() => setShowNewListInput(true)}
-                  className={`w-full py-3.5 border-2 border-dashed ${border} rounded-xl ${textSecondary} hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2 text-base`}
+                  className={`w-full py-3.5 sm:py-2 border-2 border-dashed ${border} rounded-xl sm:rounded-lg ${textSecondary} hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2 text-base sm:text-sm`}
                 >
-                  <span className="text-xl">+</span>
+                  <span className="text-xl sm:text-base">+</span>
                   <span>Create New List</span>
                 </button>
               )}
             </div>
 
-            {/* Existing Lists */}
+            {/* Existing Lists — a denser 2-column grid on desktop, where the
+                bigger modal has room, so more of the list is visible without
+                scrolling. Mobile keeps the single-column, thumb-sized rows. */}
             <div className="flex-1 overflow-y-auto -mx-4 px-4">
               {lists.length === 0 ? (
                 <div className={`text-center py-8 ${textSecondary}`}>
@@ -174,47 +178,49 @@ function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsyn
                   <p className="text-sm mt-1">Create your first list above!</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div>
                   <p className={`${textSecondary} text-xs uppercase tracking-wider font-semibold mb-2`}>
                     Your Lists ({lists.length})
                   </p>
-                  {lists.map(list => (
-                    <button
-                      key={list.id}
-                      onClick={() => setSelectedList(list.id)}
-                      className={`w-full text-left px-4 py-4 rounded-xl border-2 transition-all ${
-                        selectedList === list.id
-                          ? 'border-blue-500 bg-blue-500/20'
-                          : `${border} hover:border-gray-500 ${bgSecondary}`
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <span className={`font-semibold ${textPrimary} text-base`}>{list.name}</span>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className={`${textSecondary} text-sm`}>
-                              {list.cardCount || 0} card{(list.cardCount || 0) !== 1 ? 's' : ''}
-                            </span>
-                            {!list.synced && (
-                              <span className="text-yellow-500 text-xs bg-yellow-900/50 px-1.5 py-0.5 rounded">
-                                Unsynced
+                  <div className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-2">
+                    {lists.map(list => (
+                      <button
+                        key={list.id}
+                        onClick={() => setSelectedList(list.id)}
+                        className={`w-full text-left px-4 py-4 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-lg border-2 transition-all ${
+                          selectedList === list.id
+                            ? 'border-blue-500 bg-blue-500/20'
+                            : `${border} hover:border-gray-500 ${bgSecondary}`
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <span className={`font-semibold ${textPrimary} text-base sm:text-sm truncate block`}>{list.name}</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className={`${textSecondary} text-sm sm:text-xs`}>
+                                {list.cardCount || 0} card{(list.cardCount || 0) !== 1 ? 's' : ''}
                               </span>
-                            )}
+                              {!list.synced && (
+                                <span className="text-yellow-500 text-xs bg-yellow-900/50 px-1.5 py-0.5 rounded">
+                                  Unsynced
+                                </span>
+                              )}
+                            </div>
                           </div>
+                          {selectedList === list.id && (
+                            <div className="text-blue-400 text-xl sm:text-base flex-shrink-0 ml-2">✓</div>
+                          )}
                         </div>
-                        {selectedList === list.id && (
-                          <div className="text-blue-400 text-xl">✓</div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Note Input */}
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <label className={`block text-sm ${textSecondary} mb-2`}>
+            <div className="mt-4 pt-4 sm:mt-3 sm:pt-3 border-t border-gray-700">
+              <label className={`block text-sm sm:text-xs ${textSecondary} mb-2 sm:mb-1`}>
                 Note (optional)
               </label>
               <input
@@ -222,20 +228,20 @@ function SaveToListModal({ card, userId, onClose, theme, user, syncing, hasUnsyn
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="e.g., Replace Shock with this"
-                className={`w-full px-4 py-3 ${bgSecondary} border ${border} rounded-xl ${textPrimary}`}
+                className={`w-full px-4 py-3 sm:px-3 sm:py-2 ${bgSecondary} border ${border} rounded-xl sm:rounded-lg ${textPrimary} sm:text-sm`}
               />
             </div>
 
-            {/* Save Button - Large and prominent */}
+            {/* Save Button - prominent on mobile, a normal-sized button on desktop */}
             <button
               onClick={handleSave}
               disabled={!selectedList || saving}
-              className={`mt-4 w-full py-4 ${accent} hover:opacity-90 rounded-xl font-bold text-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity`}
+              className={`mt-4 sm:mt-3 w-full py-4 sm:py-2.5 ${accent} hover:opacity-90 rounded-xl sm:rounded-lg font-bold text-lg sm:text-base text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity`}
             >
               {saving ? 'Saving...' : selectedList ? 'Save to List' : 'Select a List'}
             </button>
 
-            <div className="mt-3 flex items-center justify-center gap-3">
+            <div className="mt-3 sm:mt-2 flex items-center justify-center gap-3">
               <p className={`${textSecondary} text-xs`}>
                 Saved locally
               </p>
