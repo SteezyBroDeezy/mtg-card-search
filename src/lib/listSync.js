@@ -58,13 +58,24 @@ export async function getListCardsLocal(listId) {
   return await db.listCards.where('listId').equals(listId).toArray()
 }
 
-// Add card to list locally
-export async function addCardToListLocal(listId, card, note = '') {
+// Add card to list locally. `quantity` is for deck-list-style adds (bulk
+// import) — a plain "Save to List" click never passes it and every
+// existing row without one is read as 1 (see priceOf/quantityOf callers).
+// It is not an indexed field, so no schema version bump is needed to add
+// it to records going forward; old rows simply lack the property.
+export async function addCardToListLocal(listId, card, note = '', quantity = 1) {
   const existing = await db.listCards.get([listId, card.id])
   if (existing) {
-    // Already exists, just update note if different
-    if (existing.note !== note) {
-      await db.listCards.update([listId, card.id], { note, synced: false })
+    // Already exists — update whichever of note/quantity actually changed.
+    // Bulk-importing the same decklist again is meant to reset quantity to
+    // what the list says now, not add to whatever was there before.
+    const changes = {}
+    if (existing.note !== note && note) changes.note = note
+    if (quantity && existing.quantity !== quantity) changes.quantity = quantity
+    if (Object.keys(changes).length > 0) {
+      changes.synced = false
+      await db.listCards.update([listId, card.id], changes)
+      return { ...existing, ...changes }
     }
     return existing
   }
@@ -80,6 +91,7 @@ export async function addCardToListLocal(listId, card, note = '') {
     image_small: imageSmall,
     image_normal: imageNormal,
     note,
+    quantity,
     addedAt: new Date().toISOString(),
     synced: false
   }
@@ -151,6 +163,7 @@ export async function mergeListsLocal({ targetListId, sourceListId, newName, use
       image_small: card.image_small,
       image_normal: card.image_normal,
       note: card.note || '',
+      quantity: card.quantity || 1,
       addedAt: card.addedAt || new Date().toISOString(),
       synced: false
     })
@@ -194,6 +207,7 @@ export async function mergeListsLocal({ targetListId, sourceListId, newName, use
             image_small: card.image_small || '',
             image_normal: card.image_normal || '',
             note: card.note || '',
+            quantity: card.quantity || 1,
             addedAt: card.addedAt || new Date().toISOString()
           })
           await db.listCards.update([targetListId, card.cardId], { synced: true })
@@ -281,6 +295,7 @@ export async function syncLists(userId) {
             image_small: card.image_small,
             image_normal: card.image_normal,
             note: card.note || '',
+            quantity: card.quantity || 1,
             addedAt: card.addedAt
           })
         }
@@ -319,6 +334,7 @@ export async function syncLists(userId) {
             image_small: card.image_small,
             image_normal: card.image_normal,
             note: card.note || '',
+            quantity: card.quantity || 1,
             addedAt: card.addedAt,
             synced: true
           })
@@ -352,6 +368,7 @@ export async function syncLists(userId) {
             image_small: card.image_small,
             image_normal: card.image_normal,
             note: card.note || '',
+            quantity: card.quantity || 1,
             addedAt: card.addedAt,
             synced: true
           })
@@ -379,6 +396,7 @@ export async function syncLists(userId) {
             image_small: card.image_small || '',
             image_normal: card.image_normal || '',
             note: card.note || '',
+            quantity: card.quantity || 1,
             addedAt: card.addedAt || new Date().toISOString()
           })
           await db.listCards.put({ ...card, synced: true })

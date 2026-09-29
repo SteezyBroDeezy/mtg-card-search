@@ -5,6 +5,7 @@ import QuickCardView from './components/QuickCardView'
 import SaveToListModal from './components/SaveToListModal'
 import AuthModal from './components/AuthModal'
 import MyLists from './components/MyLists'
+import BulkImportModal from './components/BulkImportModal'
 import Settings from './components/Settings'
 import PriceOracle from './components/PriceOracle'
 import SyntaxHelp from './components/SyntaxHelp'
@@ -72,6 +73,7 @@ function App() {
   const [showAuth, setShowAuth] = useState(false)
   const [user, setUser] = useState(null)
   const [showLists, setShowLists] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showPriceOracle, setShowPriceOracle] = useState(false)
   const [currentTheme, setCurrentTheme] = useState(loadTheme())
@@ -1093,6 +1095,14 @@ function App() {
                   <span className="hidden sm:inline">Lists</span>
                 </button>
                 <button
+                  onClick={() => setShowBulkImport(true)}
+                  className={`p-2 sm:px-3 sm:py-2 ${theme.bgTertiary} rounded-lg border ${theme.borderAccent || theme.border} hover:opacity-90 transition-opacity`}
+                  title="Bulk Import Deck"
+                >
+                  <span className="sm:hidden">📥</span>
+                  <span className="hidden sm:inline">Import Deck</span>
+                </button>
+                <button
                   onClick={handleLogout}
                   className={`p-2 sm:px-3 sm:py-2 ${theme.textSecondary} hover:opacity-70 transition-opacity`}
                   title="Log Out"
@@ -1735,6 +1745,19 @@ function App() {
           userId={user.uid}
           onClose={() => { setShowLists(false); checkSyncStatus(); }}
           onCardClick={handleListCardClick}
+        />
+      )}
+
+      {showBulkImport && user && (
+        <BulkImportModal
+          dbReady={dbStatus === 'ready'}
+          onClose={() => setShowBulkImport(false)}
+          onImported={checkSyncStatus}
+          theme={theme}
+          user={user}
+          syncing={syncing}
+          hasUnsynced={hasUnsynced}
+          onSyncLists={handleListSync}
         />
       )}
 

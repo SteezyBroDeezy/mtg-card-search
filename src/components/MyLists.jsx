@@ -184,8 +184,15 @@ function MyLists({ userId, onClose, onCardClick }) {
     return Number.isFinite(n) ? n : null
   }
 
+  // Rows added one at a time (Save to List) never set this; a bulk-imported
+  // decklist does, so a 4-of counts as 4 toward both the display badge and
+  // the list total below.
+  function quantityOf(card) {
+    return card.quantity && card.quantity > 0 ? card.quantity : 1
+  }
+
   const listTotal = useMemo(
-    () => cards.reduce((sum, c) => sum + (priceOf(c) || 0), 0),
+    () => cards.reduce((sum, c) => sum + (priceOf(c) || 0) * quantityOf(c), 0),
     [cards]
   )
   const pricedCount = useMemo(
@@ -450,7 +457,10 @@ function MyLists({ userId, onClose, onCardClick }) {
                       }}
                     >
                       {selectMode && (
-                        <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        // Right side, not left — the quantity badge below
+                        // lives at top-left and the two would otherwise
+                        // overlap while selecting.
+                        <div className={`absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center ${
                           selectedCards.has(card.cardId)
                             ? 'bg-purple-600 border-purple-600 text-white'
                             : 'bg-black/50 border-white/50'
@@ -464,6 +474,14 @@ function MyLists({ userId, onClose, onCardClick }) {
                         className="w-full rounded-lg"
                         loading="lazy"
                       />
+                      {/* Quantity — only shown above 1x, since that's the
+                          overwhelming majority of rows (cards saved one at a
+                          time have no quantity at all). Set by bulk import. */}
+                      {quantityOf(card) > 1 && (
+                        <div className="absolute top-1 left-1 bg-blue-600/90 text-white text-xs font-bold px-1.5 py-0.5 rounded">
+                          ×{quantityOf(card)}
+                        </div>
+                      )}
                       {/* Scryfall price badge — foil price is used only when
                           there's no non-foil price, so label it. */}
                       <div className="absolute bottom-1 left-1 right-1 flex justify-center pointer-events-none">
