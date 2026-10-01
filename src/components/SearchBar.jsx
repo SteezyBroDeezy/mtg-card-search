@@ -14,6 +14,15 @@ import { FUN_CATEGORIES, randomFunSearch, filterFunSearches } from '../lib/funSe
 import { looksLikeFilterQuery } from '../lib/search'
 import { swallowNextClick } from '../lib/ghostClick'
 
+// The suggestions dropdown otherwise only offers exact card names to tap,
+// which is the natural thing to tap on a phone — so that's what people tap,
+// and it narrows straight to one card. This is the "see everything" escape
+// hatch, pinned to the top of the list: functionally identical to typing
+// the term and pressing Search.
+function broadSearchEntry(term) {
+  return { displayName: `Search for all "${term}"`, searchName: term, isBroadSearch: true }
+}
+
 function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initialQuery = '', isSearching = false, useScryfallAutocomplete = false, offlineOnly = false, onFunSearch }) {
   const [query, setQuery] = useState(initialQuery)
   const [showHelper, setShowHelper] = useState(false)
@@ -145,13 +154,14 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           const data = await res.json()
           if (cancelled) return
           const names = Array.isArray(data?.data) ? data.data : []
-          const out = names.slice(0, 12).map(name => ({
+          const matches = names.slice(0, 12).map(name => ({
             displayName: name,
             searchName: name
           }))
+          const out = matches.length > 0 ? [broadSearchEntry(trimmed), ...matches] : matches
           writeCache(out)
           setSuggestions(out)
-          setShowSuggestions(out.length > 0)
+          setShowSuggestions(matches.length > 0)
           setSelectedSuggestionIndex(-1)
         } catch (err) {
           if (cancelled) return
@@ -267,14 +277,15 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
           return a.displayName.localeCompare(b.displayName)
         })
 
-        const out = combined.slice(0, 12).map(c => ({
+        const matches = combined.slice(0, 12).map(c => ({
           displayName: c.displayName,
           searchName: c.name
         }))
+        const out = matches.length > 0 ? [broadSearchEntry(trimmed), ...matches] : matches
 
         writeCache(out)
         setSuggestions(out)
-        setShowSuggestions(out.length > 0)
+        setShowSuggestions(matches.length > 0)
         setSelectedSuggestionIndex(-1)
         if (forceSuggestRef.current) {
           forceSuggestRef.current = false
@@ -328,8 +339,12 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
 
   function handleSuggestionClick(suggestion) {
     // suggestion can be object {displayName, searchName} or string (for backwards compatibility)
+    const isBroadSearch = typeof suggestion === 'object' && suggestion.isBroadSearch
     const searchName = typeof suggestion === 'object' ? suggestion.searchName : suggestion
-    const displayName = typeof suggestion === 'object' ? suggestion.displayName : suggestion
+    // The broad-search row's displayName is a descriptive label ('Search
+    // for "ajani"'), not something to put in the box — the box gets the
+    // bare term instead, same as if Search had just been pressed.
+    const boxText = isBroadSearch ? searchName : (typeof suggestion === 'object' ? suggestion.displayName : suggestion)
     // Setting query to the picked name would otherwise re-trigger the
     // suggestion fetcher and pop the dropdown right back open. Skip the
     // next run.
@@ -337,7 +352,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     // We acted on pointerdown; kill the click that follows so it can't land
     // on a card tile or button that just moved under the finger.
     swallowNextClick()
-    setQuery(displayName)
+    setQuery(boxText)
     setSuggestions([])
     setShowSuggestions(false)
     setSelectedSuggestionIndex(-1)
@@ -345,6 +360,7 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
     // Drop focus from the input so the mobile keyboard doesn't pop back up.
     inputRef.current?.blur()
   }
+
 
   function handleKeyDown(e) {
     // Esc: hide suggestions if open, otherwise clear the input
@@ -722,8 +738,11 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
               style={{ touchAction: 'manipulation' }}
             >
               {suggestions.map((suggestion, idx) => {
+                const isBroadSearch = typeof suggestion === 'object' && suggestion.isBroadSearch
                 const displayName = typeof suggestion === 'object' ? suggestion.displayName : suggestion
-                const key = typeof suggestion === 'object' ? suggestion.searchName : suggestion
+                const key = isBroadSearch
+                  ? `__broad__:${suggestion.searchName}`
+                  : (typeof suggestion === 'object' ? suggestion.searchName : suggestion)
                 return (
                   <div
                     key={key}
@@ -737,11 +756,16 @@ function SearchBar({ onSearch, theme, searchHistory = [], onHistorySelect, initi
                       handleSuggestionClick(suggestion)
                     }}
                     onKeyDown={(e) => e.key === 'Enter' && handleSuggestionClick(suggestion)}
-                    className={`w-full px-4 py-3.5 min-h-[52px] flex items-center text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer select-none ${
+                    className={`w-full px-4 py-3.5 min-h-[52px] flex items-center gap-2 text-left hover:bg-blue-600/30 active:bg-blue-600/50 transition-colors cursor-pointer select-none ${
                       idx === selectedSuggestionIndex ? 'bg-blue-600/40' : ''
-                    } ${theme.text}`}
+                    } ${isBroadSearch ? 'font-semibold' : ''} ${theme.text}`}
                     style={{ touchAction: 'manipulation' }}
                   >
+                    {isBroadSearch && (
+                      <svg className="w-4 h-4 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+                      </svg>
+                    )}
                     {displayName}
                   </div>
                 )
