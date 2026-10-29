@@ -32,6 +32,7 @@ function MyLists({ userId, onClose, onCardClick }) {
   // Newest-added first by default — the card you just put in a deck is the
   // one you're most likely looking for again right after adding it.
   const [sortBy, setSortBy] = useState('added-desc')
+  const [cardFilter, setCardFilter] = useState('')
   // Merge dialog: source list to merge into another, target choice, name choice
   const [mergeSource, setMergeSource] = useState(null)
   const [mergeTargetId, setMergeTargetId] = useState('')
@@ -106,6 +107,7 @@ function MyLists({ userId, onClose, onCardClick }) {
     setSelectedList(list)
     setLoadingCards(true)
     setSortBy('added-desc')
+    setCardFilter('')
     try {
       const listCards = await getListCardsLocal(list.id)
       // List rows only carry the bare minimum (id/name/image). Enrich each row
@@ -204,6 +206,14 @@ function MyLists({ userId, onClose, onCardClick }) {
 
   // Sort the enriched list cards using the shared comparator.
   const sortedCards = useMemo(() => sortCards(cards, sortBy), [cards, sortBy])
+
+  // Filter by name after sorting so the search box narrows the current
+  // sort order instead of resetting it.
+  const visibleCards = useMemo(() => {
+    const q = cardFilter.trim().toLowerCase()
+    if (!q) return sortedCards
+    return sortedCards.filter(c => c.name?.toLowerCase().includes(q))
+  }, [sortedCards, cardFilter])
 
   function handleDeleteList(list) {
     setDeleteConfirm(list)
@@ -401,6 +411,16 @@ function MyLists({ userId, onClose, onCardClick }) {
               <p className="text-gray-500 text-center py-8">No cards in this list</p>
             ) : (
               <>
+                {/* Search within this list */}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    value={cardFilter}
+                    onChange={(e) => setCardFilter(e.target.value)}
+                    placeholder="Search this list..."
+                    className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg text-sm border border-gray-600 placeholder-gray-400"
+                  />
+                </div>
                 {/* Select mode + sort controls */}
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <button
@@ -445,8 +465,11 @@ function MyLists({ userId, onClose, onCardClick }) {
                     </select>
                   </div>
                 </div>
+                {visibleCards.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No cards match "{cardFilter}"</p>
+                ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {sortedCards.map(card => (
+                  {visibleCards.map(card => (
                     <div
                       key={card.cardId}
                       className={`relative group cursor-pointer ${selectMode && selectedCards.has(card.cardId) ? 'ring-2 ring-purple-500 rounded-lg' : ''}`}
@@ -518,6 +541,7 @@ function MyLists({ userId, onClose, onCardClick }) {
                   </div>
                 ))}
                 </div>
+                )}
               </>
             )
           ) : (
