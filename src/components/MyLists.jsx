@@ -33,6 +33,7 @@ function MyLists({ userId, onClose, onCardClick }) {
   // one you're most likely looking for again right after adding it.
   const [sortBy, setSortBy] = useState('added-desc')
   const [cardFilter, setCardFilter] = useState('')
+  const [listFilter, setListFilter] = useState('')
   // Merge dialog: source list to merge into another, target choice, name choice
   const [mergeSource, setMergeSource] = useState(null)
   const [mergeTargetId, setMergeTargetId] = useState('')
@@ -206,6 +207,12 @@ function MyLists({ userId, onClose, onCardClick }) {
 
   // Sort the enriched list cards using the shared comparator.
   const sortedCards = useMemo(() => sortCards(cards, sortBy), [cards, sortBy])
+
+  const visibleLists = useMemo(() => {
+    const q = listFilter.trim().toLowerCase()
+    if (!q) return lists
+    return lists.filter(l => l.name?.toLowerCase().includes(q))
+  }, [lists, listFilter])
 
   // Filter by name after sorting so the search box narrows the current
   // sort order instead of resetting it.
@@ -581,13 +588,27 @@ function MyLists({ userId, onClose, onCardClick }) {
                 </button>
               )}
 
+              {lists.length > 0 && (
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={listFilter}
+                    onChange={(e) => setListFilter(e.target.value)}
+                    placeholder="Search lists..."
+                    className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg text-sm border border-gray-600 placeholder-gray-400"
+                  />
+                </div>
+              )}
+
               {lists.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">
                   No lists yet. Create one or sync to pull from cloud.
                 </p>
+              ) : visibleLists.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No lists match "{listFilter}"</p>
               ) : (
                 <div className="space-y-2">
-                  {lists.map(list => (
+                  {visibleLists.map(list => (
                     <div
                       key={list.id}
                       className="flex items-center justify-between p-4 bg-gray-700 rounded-lg hover:bg-gray-600 cursor-pointer"
